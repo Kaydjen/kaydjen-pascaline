@@ -15,10 +15,10 @@ import {
   Shape,
   SphereGeometry,
   SRGBColorSpace,
-  TorusGeometry,
   Vector2,
   type Material,
 } from "three";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { getMaterial } from "../materials/factory";
 import { FONT_LABEL, FONT_NUMERAL } from "../materials/fonts";
 import { STEP_DEG } from "../sim/params";
@@ -32,7 +32,7 @@ import {
   CASE_Y_FRONT,
   CROWN_HOLE_RADIUS,
   crownAngleDeg,
-  crownHeight,
+  CROWN_EDGE,
   crownOuterRadius,
   LABEL_THICKNESS,
   LABEL_Y_FROM,
@@ -58,6 +58,11 @@ import { INPUT_SHAFT_Y } from "./dimensions";
 import { outerHalfWidth } from "./boxCase";
 
 const RAD = Math.PI / 180;
+/** Crown: height of the thick ring below, how far the plate's edges sit inside it, and how far the plate is pushed off-centre (mm). */
+const CROWN_BASE_HEIGHT = 1.1;
+const CROWN_PLATE_MARGIN = 0.4;
+const CROWN_PLATE_SHIFT_MIN = 0.18;
+const CROWN_PLATE_SHIFT_MAX = 0.4;
 /** The window opening widens towards the top: extra margin at the front (the lid edge must not clip a digit seen from the default camera), the sides and the back. */
 const WINDOW_BEVEL_FRONT = 2.6;
 const WINDOW_BEVEL_SIDE = 0.4;
@@ -76,7 +81,7 @@ function canvasTexture(width: number, height: number, draw: (ctx: CanvasRenderin
 }
 
 /** Hand-cut numerals on the crown band: uneven size, slant and offset, an engraver's serif face, short radial notches between them. */
-function crownTexture(outer: number): CanvasTexture | null {
+function crownTexture(inner: number, outer: number): CanvasTexture | null {
   const size = 2048;
   const pxPerMm = size / 2 / outer;
   return canvasTexture(size, size, (ctx) => {
@@ -88,14 +93,14 @@ function crownTexture(outer: number): CanvasTexture | null {
     ctx.lineCap = "round";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    const mid = (CROWN_HOLE_RADIUS + outer) / 2;
+    const mid = (inner + outer) / 2;
     for (let d = 0; d < 10; d++) {
       const a = crownAngleDeg(d) * RAD;
       const radius = (mid - 0.3 + jitter(0.15)) * pxPerMm;
       ctx.save();
       ctx.translate(size / 2 + radius * Math.sin(a), size / 2 - radius * Math.cos(a));
       ctx.rotate(numeralRotation(a) + jitter(3) * RAD);
-      ctx.font = `${Math.round(3.7 * pxPerMm * (1 + jitter(0.06)))}px ${FONT_NUMERAL}`;
+      ctx.font = `${Math.round(3.2 * pxPerMm * (1 + jitter(0.06)))}px ${FONT_NUMERAL}`;
       ctx.fillText(String(d), jitter(0.15) * pxPerMm, 0.1 * pxPerMm);
       ctx.restore();
       // notch halfway to the next numeral: short, exactly radial (they point at the wheel centre)
@@ -111,30 +116,24 @@ function crownTexture(outer: number): CanvasTexture | null {
   });
 }
 
-/** Ring face as a flat-mapped grid whose heights follow the dome, so that the numeral overlay lies on the band. */
-function domedRing(inner: number, outer: number, lift: number): RingGeometry {
-  const geometry = new RingGeometry(inner, outer, 64, 4);
-  const position = geometry.getAttribute("position");
-  for (let k = 0; k < position.count; k++) {
-    const t = (Math.hypot(position.getX(k), position.getY(k)) - inner) / (outer - inner);
-    position.setZ(k, crownHeight(Math.min(Math.max(t, 0), 1)) + lift);
-  }
-  geometry.computeVertexNormals();
-  return geometry;
-}
-
-/** Solid band of the crown: a lathe of the domed cross-section (axis z after the turn). */
-function crownBandGeometry(inner: number, outer: number): LatheGeometry {
-  const profile: Vector2[] = [new Vector2(inner, 0), new Vector2(outer, 0)];
-  const steps = 5;
-  for (let k = 0; k <= steps; k++) {
-    const t = 1 - k / steps;
-    profile.push(new Vector2(inner + t * (outer - inner), crownHeight(t)));
-  }
-  profile.push(new Vector2(inner, 0));
-  const geometry = new LatheGeometry(profile, 64);
-  geometry.rotateX(Math.PI / 2);
-  return geometry;
+/**
+ * Flat-topped ring with crisp corners, as lathes of its own faces (separate profiles keep the corners sharp): outer wall, small
+ * top chamfers, flat top, inner wall. The underside is left open (it sits on the lid or on the ring below).
+ */
+function flatRing(inner: number, outer: number, z0: number, z1: number, chamfer: number): BufferGeometry {
+  const profiles: [number, number][][] = [
+    [[outer, z0], [outer, z1 - chamfer]],
+    [[outer, z1 - chamfer], [outer - chamfer, z1]],
+    [[outer - chamfer, z1], [inner + chamfer, z1]],
+    [[inner + chamfer, z1], [inner, z1 - chamfer]],
+    [[inner, z1 - chamfer], [inner, z0]],
+  ];
+  const parts = profiles.map((points) => {
+    const part = new LatheGeometry(points.map(([x, y]) => new Vector2(x, y)), 64);
+    part.rotateX(Math.PI / 2);
+    return part;
+  });
+  return mergeGeometries(parts, false)!;
 }
 
 /** Handwritten-style French labels, one per level; texture pixels are square (PX_PER_MM both ways). */
@@ -394,29 +393,37 @@ export function buildLid(levelCount: number, pitch: number): LidParts {
     lid.add(named(at(slottedScrew(brass, dark, 0.8, 0.2 + k), 0, y, LID_TOP), `lidScrew:${k}`));
   }
 
-  // crown rings: wide steel band with a slightly domed top; hand-cut numerals on a transparent overlay; a dark closed disc inside
-  const numerals = new MeshStandardMaterial({ map: crownTexture(crownOuter), transparent: true, metalness: 0, roughness: 0.6, depthWrite: false });
-  const bandGeometry = crownBandGeometry(CROWN_HOLE_RADIUS - 0.1, crownOuter);
-  const faceGeometry = domedRing(CROWN_HOLE_RADIUS - 0.1, crownOuter, 0.015);
-  const plateGeometry = new CylinderGeometry(CROWN_HOLE_RADIUS, CROWN_HOLE_RADIUS, WHEEL_PLATE_THICKNESS, 64);
-  plateGeometry.rotateX(Math.PI / 2);
+  // crown rings (photos): two parts. A thick dark ring stands on the lid; on it lies a thin flat plate that carries the numerals
+  // (hand-cut, on a transparent overlay) and sits a little off-centre, a different way on every crown, so the ring below shows on one side
+  const innerRadius = CROWN_HOLE_RADIUS - 0.1;
+  const plateInner = innerRadius + CROWN_PLATE_MARGIN;
+  const plateOuter = crownOuter - CROWN_PLATE_MARGIN;
+  const numerals = new MeshStandardMaterial({ map: crownTexture(plateInner, plateOuter), transparent: true, metalness: 0, roughness: 0.6, depthWrite: false });
+  const ringGeometry = flatRing(innerRadius, crownOuter, 0, CROWN_BASE_HEIGHT, 0.12);
+  const plateGeometry = flatRing(plateInner, plateOuter, CROWN_BASE_HEIGHT, CROWN_EDGE, 0.06);
+  const faceGeometry = new RingGeometry(plateInner + 0.06, plateOuter - 0.06, 64, 1);
+  const shift = seededRandom(1652);
+  const closedDiscGeometry = new CylinderGeometry(CROWN_HOLE_RADIUS, CROWN_HOLE_RADIUS, WHEEL_PLATE_THICKNESS, 64);
+  closedDiscGeometry.rotateX(Math.PI / 2);
   const reach = crownOuter + 1.7 - STOP_TIP_RADIUS;
   for (let i = 0; i < levelCount; i++) {
     const crown = named(new Group(), `crown:${i}`);
     crown.position.set(levelX(i), INPUT_SHAFT_Y, LID_TOP);
-    const band = new Mesh(bandGeometry, steel);
-    band.userData.noShadow = true; // 26 k triangles of rings are not worth a place in the shadow pass
+    const ring = new Mesh(ringGeometry, dark);
+    ring.userData.noShadow = true; // 26 k triangles of rings were not worth a place in the shadow pass
+    const plate = new Group();
+    const direction = shift() * Math.PI * 2;
+    const distance = CROWN_PLATE_SHIFT_MIN + shift() * (CROWN_PLATE_SHIFT_MAX - CROWN_PLATE_SHIFT_MIN);
+    plate.position.set(Math.cos(direction) * distance, Math.sin(direction) * distance, 0);
+    const disc = new Mesh(plateGeometry, steel);
+    disc.userData.noShadow = true;
     const face = new Mesh(faceGeometry, numerals);
+    face.position.z = CROWN_EDGE + 0.015;
     face.userData.noShadow = true;
-    crown.add(band, face);
-    for (const radius of [CROWN_HOLE_RADIUS - 0.1, crownOuter - 0.12]) {
-      const lip = new Mesh(new TorusGeometry(radius, 0.2, 5, 64), steel);
-      lip.userData.noShadow = true;
-      lip.position.z = crownHeight(radius < CROWN_HOLE_RADIUS ? 0 : 1) + 0.02;
-      crown.add(lip);
-    }
+    plate.add(disc, face);
+    crown.add(ring, plate);
     lid.add(crown);
-    const wheelPlate = named(at(new Mesh(plateGeometry, dark), levelX(i), INPUT_SHAFT_Y, LID_TOP + WHEEL_PLATE_THICKNESS / 2), `wheelPlate:${i}`);
+    const wheelPlate = named(at(new Mesh(closedDiscGeometry, dark), levelX(i), INPUT_SHAFT_Y, LID_TOP + WHEEL_PLATE_THICKNESS / 2), `wheelPlate:${i}`);
     wheelPlate.userData.bearing = true; // the input shaft runs through it
     lid.add(wheelPlate);
     lid.add(named(at(stopLever(brass, reach), levelX(i), INPUT_SHAFT_Y - crownOuter - 1.7, LID_TOP), `stopLever:${i}`));

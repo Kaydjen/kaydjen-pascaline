@@ -25,10 +25,8 @@ export const PLINTH_OVERHANG = 2.5;
 export const CROWN_HOLE_RADIUS = 16.4;
 /** Neighbouring crowns touch: the outer diameter is the level pitch. */
 export const crownOuterRadius = (pitch: number): number => pitch / 2 - 0.05;
-/** The crown is a wide raised band with a slightly domed top: edge height and extra height at the middle (mm). */
+/** The crown stands this high above the lid: a thick ring with a thin numeral plate on it (mm). */
 export const CROWN_EDGE = 1.5;
-export const CROWN_DOME = 0.25;
-export const crownHeight = (t: number): number => CROWN_EDGE + CROWN_DOME * Math.sin(Math.PI * t);
 /** Dark closed disc on the lid under every wheel (the real plate under the spokes). */
 export const WHEEL_PLATE_THICKNESS = 0.12;
 
