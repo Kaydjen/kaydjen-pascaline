@@ -1,0 +1,294 @@
+:root {
+  --bg: #0b0a09;
+  --text: #e8dfcf;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, sans-serif;
+}
+
+#scene {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+  touch-action: none;
+  opacity: 0;
+  transition: opacity 1.5s ease-out;
+}
+
+#scene.ready {
+  opacity: 1;
+}
+
+/* radial vignette and a faint noise tile over the canvas (no post-processing pass) */
+#veil {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 46%, transparent 52%, rgba(5, 4, 3, 0.55) 100%);
+}
+
+#veil::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.045;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1.2 -0.1'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #scene {
+    transition-duration: 0.3s;
+  }
+}
+
+#fallback {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+}
+
+#fallback[hidden] {
+  display: none;
+}
+
+/* ---- interface: warm black, brass hairlines, one accent (verdigris) used only for the running demo word and the contact lamps ---- */
+:root {
+  --brass: #b8924a;
+  --dim: #8a7f6c;
+  --accent: #5fb3a1;
+}
+
+.dock {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 22px;
+  pointer-events: none;
+  font: 13px/1 system-ui, sans-serif;
+  letter-spacing: 0.04em;
+  color: var(--dim);
+}
+
+.dock > div {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  pointer-events: none;
+  flex: 1;
+}
+
+.dock > div > * {
+  pointer-events: auto;
+}
+
+.dock-centre {
+  justify-content: center;
+}
+
+.dock-right {
+  justify-content: flex-end;
+}
+
+.dock button {
+  font: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 6px 2px;
+  cursor: pointer;
+  transition: color 160ms ease-out;
+}
+
+.dock button:hover {
+  color: var(--text);
+}
+
+.dock button.on {
+  color: var(--brass);
+}
+
+.dock button.accent {
+  color: var(--accent);
+}
+
+.dock button svg {
+  display: block;
+}
+
+:where(.dock button):focus-visible {
+  outline: 1px solid var(--brass);
+  outline-offset: 3px;
+}
+
+/* groups of exclusive text buttons (view step, add or subtract): a hairline frame, the current one in brass */
+.segmented {
+  display: flex;
+  border: 1px solid rgba(184, 146, 74, 0.28);
+}
+
+.segmented button {
+  padding: 8px 14px;
+  border-right: 1px solid rgba(184, 146, 74, 0.28);
+}
+
+.segmented button:last-child {
+  border-right: 0;
+}
+
+.segmented button.on {
+  color: var(--brass);
+  background: rgba(184, 146, 74, 0.12);
+}
+
+.dock .sep {
+  width: 1px;
+  height: 14px;
+  background: rgba(184, 146, 74, 0.28);
+}
+
+.chip {
+  position: fixed;
+  left: 0;
+  top: 0;
+  padding: 4px 11px 5px;
+  background: rgba(20, 18, 15, 0.92);
+  border: 1px solid rgba(184, 146, 74, 0.4);
+  color: #e8dfcf;
+  font: italic 16px/1.2 "EB Garamond Italic", serif;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 100ms ease-in;
+  white-space: nowrap;
+}
+
+.chip.visible {
+  opacity: 1;
+  transition-duration: 150ms;
+}
+
+.hint {
+  position: fixed;
+  left: 50%;
+  bottom: 74px;
+  margin: 0;
+  transform: translateX(-50%);
+  color: #cdbfa6;
+  font: italic 17px/1.2 "EB Garamond Italic", serif;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 500ms ease-out;
+}
+
+.hint.visible {
+  opacity: 0.85;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.loading-line {
+  position: fixed;
+  left: 0;
+  bottom: 0;
+  height: 1px;
+  width: 0;
+  background: var(--brass);
+  transition: width 3s cubic-bezier(0.2, 0.7, 0.2, 1), opacity 500ms ease-out;
+}
+
+.loading-line.growing {
+  width: 85%;
+}
+
+.loading-line.finished {
+  width: 100%;
+  opacity: 0;
+  transition: width 200ms ease-out, opacity 500ms ease-out;
+}
+
+#fallback {
+  color: var(--dim);
+  font: 14px/1.5 system-ui, sans-serif;
+  padding: 0 24px;
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dock button,
+  .chip,
+  .hint,
+  .loading-line {
+    transition-duration: 1ms;
+  }
+}
+
+/* developer panel (dev builds only, ?debug) */
+#debug {
+  position: fixed;
+  left: 12px;
+  bottom: 12px;
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  background: rgba(20, 18, 15, 0.88);
+  border: 1px solid #2a251e;
+  font: 12px ui-monospace, Consolas, monospace;
+  color: #9a8f7c;
+}
+
+#debug .row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+#debug input[type="range"] {
+  width: 260px;
+}
+
+#debug button {
+  font: inherit;
+  color: #e8dfcf;
+  background: #14120f;
+  border: 1px solid #2a251e;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+
+#debug button.on {
+  border-color: #b8924a;
+  color: #b8924a;
+}
+
+#debug pre {
+  margin: 0;
+}

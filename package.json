@@ -1,0 +1,36 @@
+﻿{
+  "name": "kaydjen-pascaline",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "probe": "node scripts/probe.mjs",
+    "look": "node scripts/look.mjs",
+    "budget": "node scripts/budget.mjs",
+    "compare": "node scripts/compare.mjs",
+    "strip": "node scripts/strip.mjs",
+    "interact": "node scripts/interact.mjs",
+    "smoke": "node scripts/smoke.mjs",
+    "bake": "node scripts/bake.mjs",
+    "spots": "node scripts/spots.mjs"
+  },
+  "dependencies": {
+    "@fontsource/eb-garamond": "5.3.0",
+    "@fontsource/im-fell-english": "5.3.0",
+    "three": "0.186.1"
+  },
+  "devDependencies": {
+    "@types/node": "24",
+    "@types/three": "0.186.0",
+    "playwright-core": "1.64.1",
+    "sharp": "^0.35.5",
+    "typescript": "7.0.2",
+    "vite": "8.3.5",
+    "vitest": "5.0.5"
+  }
+}

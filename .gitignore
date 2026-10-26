@@ -1,0 +1,8 @@
+node_modules
+dist
+.vercel
+*.log
+
+# Third-party reference photos: for comparison only, never commit or publish
+docs/reference/photos/
+lab-assets/
