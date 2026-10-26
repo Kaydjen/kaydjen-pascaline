@@ -1,6 +1,7 @@
 import type { Material, Mesh } from "three";
 import { bakeLidFootprint } from "../materials/footprint";
 import { lidFootprint } from "../materials/wear";
+import type { MaterialTuner } from "../materials/lookRuntime";
 import type { AoHandle } from "../scene/ao";
 import type { StageDebug } from "../scene/stage";
 
@@ -25,7 +26,7 @@ export interface AoTune {
 }
 
 /** Dev only: lets scripts/spots.mjs switch the look variants at run time (no reload), so that they can be compared on one sheet. */
-export function mountTune(debug: StageDebug, ao: AoHandle | null): void {
+export function mountTune(debug: StageDebug, ao: AoHandle | null, material: MaterialTuner): void {
   const wearUniforms = (): Record<string, { value: number }>[] => {
     const list: Record<string, { value: number }>[] = [];
     debug.scene.traverse((o) => {
@@ -36,6 +37,12 @@ export function mountTune(debug: StageDebug, ao: AoHandle | null): void {
     return list;
   };
   const tune = {
+    /** `material("steel-ring", { scan: { tint: "#3a3228" } })`: values relative to the shipped look, `{}` restores it. Resolves with the shader features the material lacks. */
+    material,
+    /** The compiled shader programs (count and who uses them), for scripts/programs.mjs. */
+    programs(): { name: string; key: string; used: number }[] {
+      return (debug.renderer.info.programs ?? []).map((p) => ({ name: p.name, key: p.cacheKey, used: p.usedTimes }));
+    },
     grime(o: GrimeTune): void {
       if (o.sigma !== undefined) bakeLidFootprint(debug.renderer, debug.scene, o.sigma);
       if (o.core) lidFootprint.core.value.set(...o.core);

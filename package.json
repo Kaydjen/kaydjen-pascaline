@@ -17,7 +17,9 @@
     "interact": "node scripts/interact.mjs",
     "smoke": "node scripts/smoke.mjs",
     "bake": "node scripts/bake.mjs",
-    "spots": "node scripts/spots.mjs"
+    "spots": "node scripts/spots.mjs",
+    "sheet": "node scripts/sheet.mjs",
+    "programs": "node scripts/programs.mjs"
   },
   "dependencies": {
     "@fontsource/eb-garamond": "5.3.0",

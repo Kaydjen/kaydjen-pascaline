@@ -6,7 +6,7 @@ import { setWallRelief } from "../parts/boxCase";
 import type { StageDebug } from "../scene/stage";
 import { setMaterialHook, type MaterialName } from "./factory";
 import { resolveMaterial, scanIds, type ResolvedMaterial } from "./lookApply";
-import type { Look } from "./looks";
+import type { Look, MaterialLook } from "./looks";
 import { CLEAN, installWear, updateScan, updateWear, wearFeatures, type ScanTextures } from "./wear";
 
 /** Baked scans and the studio HDRI live in public/ (made by `npm run bake` from the git-ignored lab-assets/). */
@@ -14,6 +14,9 @@ const SCAN_URL = (id: string, kind: string): string => `/scans/${id}/${kind}.web
 const HDRI_URL = "/hdri/studio.hdr";
 /** Width of the grime line around the parts that stand on the lid (mm). */
 const GRIME_BLUR_MM = 0.7;
+
+/** Dev: re-applies one material of the look with changed values (through the same `apply` as the start-up). */
+export type MaterialTuner = (name: MaterialName, patch: MaterialLook) => Promise<{ missing: string[] }>;
 
 export interface LookRuntime {
   /** Loads the scans and the studio light, then applies the light, the occlusion and the scans; resolves when the look is complete. */
@@ -27,7 +30,14 @@ export interface LookRuntime {
  * Call before the machine is built; the wall unevenness is part of the build.
  */
 export function installLook(look: Look): LookRuntime {
-  const registry = new Map<MaterialName, { material: MeshStandardMaterial; resolved: ResolvedMaterial }[]>();
+  interface Entry {
+    material: MeshStandardMaterial;
+    resolved: ResolvedMaterial;
+    features: Set<string>;
+    /** Colour, metalness and roughness before the look touched them (a variant that sets none of them restores these). */
+    plain: { color: number; metalness: number; roughness: number };
+  }
+  const registry = new Map<MaterialName, Entry[]>();
   const scans: Record<string, ScanTextures> = {};
   setWallRelief(look.geometry ? { uneven: look.geometry.uneven ?? 0, dents: look.geometry.dents ?? 0, seed: look.geometry.seed ?? 7 } : null);
 
@@ -42,8 +52,10 @@ export function installLook(look: Look): LookRuntime {
   setMaterialHook((material, name, faceSize) => {
     const resolved = resolveMaterial(look, name);
     if (!resolved) return; // not in the look: the plain material stays (no wear shader)
-    installWear(material, CLEAN, faceSize, wearFeatures(resolved.scan, resolved.wear));
-    registry.set(name, [...(registry.get(name) ?? []), { material, resolved }]);
+    const features = wearFeatures(resolved.scan, resolved.wear);
+    installWear(material, CLEAN, faceSize, features);
+    const plain = { color: material.color.getHex(), metalness: material.metalness, roughness: material.roughness };
+    registry.set(name, [...(registry.get(name) ?? []), { material, resolved, features, plain }]);
     apply(material, resolved);
   });
 
@@ -65,6 +77,27 @@ export function installLook(look: Look): LookRuntime {
   const scansLoading = Promise.all(scanIds(look).map(loadScan));
   hdrLoading.catch(() => undefined);
   scansLoading.catch(() => undefined);
+
+  // dev: the patch is always relative to the shipped look, so variants on one sheet do not leak into each other ({} restores the look)
+  const tuneMaterial: MaterialTuner = async (name, patch) => {
+    const base = look.materials[name] ?? {};
+    const merged: MaterialLook = { ...base, ...patch, scale: { ...base.scale, ...patch.scale }, set: { ...base.set, ...patch.set }, scan: { ...base.scan, ...patch.scan } };
+    const resolved = resolveMaterial({ ...look, materials: { [name]: merged } }, name);
+    if (!resolved) return { missing: [] };
+    for (const id of [resolved.scan.scan, resolved.scan.scan2]) if (id && !scans[id]) await loadScan(id);
+    const needed = wearFeatures(resolved.scan, resolved.wear);
+    const missing = new Set<string>();
+    for (const entry of registry.get(name) ?? []) {
+      for (const f of needed) if (!entry.features.has(f)) missing.add(f);
+      entry.resolved = resolved;
+      entry.material.color.setHex(entry.plain.color);
+      entry.material.metalness = entry.plain.metalness;
+      entry.material.roughness = entry.plain.roughness;
+      apply(entry.material, resolved);
+    }
+    // a feature the material was built without has no shader code: the value does nothing until it is in the look in looks.ts and the page is reloaded
+    return { missing: [...missing] };
+  };
 
   let aoTarget: WebGLRenderTarget | null = null;
   return {
@@ -93,7 +126,7 @@ export function installLook(look: Look): LookRuntime {
 
       bakeLidFootprint(renderer, scene, GRIME_BLUR_MM);
       const ao = look.ao?.on && aoTarget ? installAo(debug, look.ao, aoTarget) : null;
-      if (import.meta.env.DEV) void import("../dev/tune").then((m) => m.mountTune(debug, ao));
+      if (import.meta.env.DEV) void import("../dev/tune").then((m) => m.mountTune(debug, ao, tuneMaterial));
     },
   };
 }
