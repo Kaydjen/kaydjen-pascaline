@@ -45,8 +45,8 @@ describe("design rules from the photos", () => {
   it("star wheel (cnam-823-1-IMG_6513.jpg): ten flat blade spokes of constant thickness, narrowing towards the rim, two with three dots", () => {
     const wheel = vertices(find("starWheel"));
     const radius = (p: Vector3): number => Math.hypot(p.x, p.y);
-    const zs = wheel.filter((p) => radius(p) > 6).map((p) => p.z);
-    expect(Math.max(...zs) - Math.min(...zs)).toBeLessThan(1.3); // flat: one plate thickness
+    const zs = wheel.filter((p) => radius(p) > 9).map((p) => p.z); // beyond the boss in the middle
+    expect(Math.max(...zs) - Math.min(...zs)).toBeLessThan(1.6); // one plate thickness, the top sinks towards the tip
     // width of spoke 0 (pointing at phi = half a step clockwise from up) near the tip and near the hub
     const phi = (0.5 * STEP_DEG * Math.PI) / 180;
     const along = (p: Vector3): number => p.x * Math.sin(phi) + p.y * Math.cos(phi);
@@ -84,15 +84,18 @@ describe("design rules from the photos", () => {
     expect(numeralRotation(Math.PI)).toBeCloseTo(0, 9); // upright at the front stop
   });
 
-  it("wheel and crown are level: spoke tops and the ring top within 1 mm of the numbered disc plane", () => {
+  it("the crown ring stands higher than the spokes, which sink towards their tips (photos)", () => {
     const crown = findObject("crown:0");
     const ringTop = new Vector3();
     crown.getWorldPosition(ringTop);
     const wheelBox = vertices(find("starWheel"));
-    const wheelWorld = find("starWheel").localToWorld(new Vector3(0, 0, Math.max(...wheelBox.map((p) => p.z))));
-    // spec z = three y - 30; the crown group origin is at the lid top, ring edge height is 1.5
-    const ringHeight = ringTop.y - 30 + 1.5;
-    expect(Math.abs(wheelWorld.y - 30 - ringHeight)).toBeLessThan(1.2);
+    const wheel = find("starWheel");
+    const topNear = wheel.localToWorld(new Vector3(0, 0, Math.max(...wheelBox.filter((p) => Math.hypot(p.x, p.y) > 3 && Math.hypot(p.x, p.y) < 4.5).map((p) => p.z)))).y;
+    const topFar = wheel.localToWorld(new Vector3(0, 0, Math.max(...wheelBox.filter((p) => Math.hypot(p.x, p.y) > 14).map((p) => p.z)))).y;
+    const ringHeight = ringTop.y + 2.2; // the crown group origin is at the lid top; the ring top is CROWN_EDGE above it
+    expect(ringHeight - topNear).toBeGreaterThan(0.3);
+    expect(ringHeight - topNear).toBeLessThan(1.5);
+    expect(topNear - topFar).toBeGreaterThan(0.25); // the tip sits lower than the hub end
   });
 
   it("lid (bw-front-view.png, strip-barrels-crop.png): four corner hook clips, screws at the edge middles, border line 2-3 mm inside the edge", () => {

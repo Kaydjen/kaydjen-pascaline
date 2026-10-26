@@ -8,7 +8,7 @@
 // A value that needs a shader feature the material was built without is reported ("needs ...") and shows nothing until it is in looks.ts.
 // Starts its own dev server (port 5196).
 import { spawn } from "node:child_process";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readdirSync, renameSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { chromium } from "playwright-core";
@@ -24,6 +24,13 @@ if (!configPath) {
 const config = (await import(pathToFileURL(resolve(configPath)).href)).default;
 const out = flag("out") ?? `docs/look-rounds/${configPath.split(/[\\/]/).pop().replace(/\.mjs$/, "")}.png`;
 mkdirSync(dirname(out), { recursive: true });
+// without --out the folder holds only the newest sheet: older ones move to old/ (so the one to look at is always easy to find)
+const dir = dirname(out);
+for (const f of flag("out") ? [] : readdirSync(dir)) {
+  if (!f.endsWith(".png") || resolve(dir, f) === resolve(out)) continue;
+  mkdirSync(resolve(dir, "old"), { recursive: true });
+  renameSync(resolve(dir, f), resolve(dir, "old", f));
+}
 
 const variantFilter = flag("variants")?.split(",");
 const viewFilter = flag("views")?.split(",");

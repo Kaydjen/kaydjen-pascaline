@@ -36,17 +36,27 @@ export interface Look {
 
 type Materials = Look["materials"];
 
+/** Hairline scratches of the lid and the crown plates, three times the preset (user, 2026-10-26: scratch layer rewritten as random short segments). */
+const HAIRLINES = { scratchAmount: 3, scratchBump: 3 } as const;
+
 /** Brass parts from one scan, ring from another, frame darker. */
 function machineBase(opts: { lid: string; ring: string; small: string; frame: string; lidTint?: string; ringTint?: string; wearLevel?: WearLevel }): Materials {
   const wear = opts.wearLevel ?? "light";
   return {
     "brass-strip": { metalness: 1, wear, scan: { scan: opts.small, tile: 34, tint: "#d8cba8", normal: 1, zones: 1.0 } },
-    "brass-lid": { metalness: 1, wear, scan: { scan: opts.lid, tile: 70, tint: opts.lidTint ?? "#ffffff", normal: 1.1 } },
-    "brass-brushed": { metalness: 1, wear, scan: { scan: opts.small, tile: 34, tint: "#d8cba8", normal: 1 } },
-    "steel-ring": { metalness: 1, wear, scan: { scan: opts.ring, tile: 46, tint: opts.ringTint ?? "#a89466", normal: 1 } },
+    "brass-lid": { metalness: 1, wear, scale: HAIRLINES, scan: { scan: opts.lid, tile: 70, tint: opts.lidTint ?? "#ffffff", normal: 1.1 } },
+    "brass-brushed": { metalness: 1, wear, scale: { grimeAmount: 1.5 }, scan: { scan: opts.small, tile: 34, tint: "#c2ae80", normal: 1 } },
+    // hub disc and its nut: the brass of the spokes, but more rubbed and a little greyer (user, photos)
+    "brass-spoke": { metalness: 1, wear, scan: { scan: opts.frame, tile: 40, tint: "#b9a577", normal: 1 } }, // the spokes and the boss: close to the stop lever, a little brighter (user)
+    // the closed plate under the spokes: as light as the lid but matte, so that the polished spokes above it stand out without the plate going dark (user)
+    "brass-plate": { metalness: 1, wear, scan: { scan: opts.small, tile: 34, tint: "#d8cba8", normal: 1, roughAdd: 0.3 } },
+    // the stop levers and their plates: mid-bright and worn (user: bright was too new), so that they stand out from the lid and the ring without looking fresh
+    "brass-lever": { metalness: 1, wear, scale: { grimeAmount: 2, scratchAmount: 2, scratchBump: 2 }, set: { grimeScale: 0.35 }, scan: { scan: opts.small, tile: 34, tint: "#c2ae80", normal: 1, roughAdd: -0.04 } },
+    "brass-hub": { metalness: 1, wear, scale: HAIRLINES, scan: { scan: opts.frame, tile: 40, tint: "#a8986c", normal: 1, roughAdd: -0.1 } }, // the numeral plate: browner and a little more polished
+    "steel-ring": { metalness: 1, wear, scale: { ...HAIRLINES, grimeAmount: 3 }, set: { grimeScale: 0.35 }, scan: { scan: opts.ring, tile: 46, tint: opts.ringTint ?? "#9a94a6", normal: 1 } },
     "brass-frame": { metalness: 1, wear, scan: { scan: opts.frame, tile: 40, tint: "#9a8a68", normal: 1 } },
-    "brass-forged": { metalness: 1, wear, scan: { scan: opts.frame, tile: 40, tint: "#a89873", normal: 1 } },
-    "brass-dark": { metalness: 1, wear, scan: { scan: "Metal008", tile: 30, tint: "#8a7a5c", normal: 1 } },
+    "brass-forged": { metalness: 1, wear, scan: { scan: opts.frame, tile: 40, tint: "#b8a577", normal: 1 } },
+    "brass-dark": { metalness: 1, wear, scan: { scan: "Metal008", tile: 90, tint: "#8a7a5c", normal: 1 } },
     steel: { metalness: 1, wear, scan: { scan: "Metal048C", tile: 30, tint: "#a8a090", normal: 1 } },
     "bronze-trim": { metalness: 1, wear, scan: { scan: "Metal047B", tile: 40, tint: "#9a8a78", normal: 1.1 } },
   };

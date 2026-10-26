@@ -6,12 +6,12 @@ import { FloatType } from "three";
 
 /** Edge length in pixels per scan and map (the lid, the wall and the plank are seen close up, the rest is small). */
 const SCANS = {
-  Metal007: { color: 1024, normal: 1024, roughness: 512 },
-  Metal047B: { color: 1024, normal: 1024, roughness: 512 },
+  Metal007: { color: 1024, normal: 768, roughness: 512 },
+  Metal047B: { color: 1024, normal: 768, roughness: 512 },
   Wood060: { color: 1024, normal: 1024, roughness: 512 },
-  Metal048C: { color: 1024, normal: 1024, roughness: 512 },
-  Metal042B: { color: 1024, normal: 1024, roughness: 512 },
-  Metal008: { color: 1024, normal: 1024, roughness: 512 },
+  Metal048C: { color: 1024, normal: 768, roughness: 512 },
+  Metal042B: { color: 1024, normal: 768, roughness: 512 },
+  Metal008: { color: 1024, normal: 768, roughness: 512 },
 };
 const QUALITY = { color: 82, normal: 90, roughness: 80 };
 const HDRI = { file: "brown_photostudio_01", width: 512 };
@@ -29,7 +29,9 @@ for (const [id, maps] of Object.entries(SCANS)) {
     const out = `public/scans/${id}/${kind}.webp`;
     let image = sharp(`lab-assets/scans/${id}/${kind}.jpg`).resize(px, px);
     if (kind === "roughness") image = image.greyscale();
-    await image.webp({ quality: QUALITY[kind], effort: 5 }).toFile(out);
+    // lossy WebP stores the x and y of a normal as subsampled chroma: it shows as a mosaic of blocks on polished metal, so metal normals are lossless
+    const lossless = kind === "normal" && id.startsWith("Metal");
+    await image.webp(lossless ? { lossless: true } : { quality: QUALITY[kind], effort: 5 }).toFile(out);
     console.log(out, size(out));
   }
 }

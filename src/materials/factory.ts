@@ -4,6 +4,10 @@ import { lidTextures, noteTexture, woodTexture, type LidTextures } from "./textu
 
 export type MaterialName =
   | "brass-brushed"
+  | "brass-hub"
+  | "brass-lever"
+  | "brass-spoke"
+  | "brass-plate"
   | "brass-strip"
   | "brass-lid"
   | "brass-dark"
@@ -28,6 +32,10 @@ interface Spec {
 /** Colour, metalness and roughness of every named material (start values, tuned by eye against the photos). */
 const SPECS: Record<MaterialName, Spec> = {
   "brass-brushed": { color: 0xb89a55, metalness: 0.8, roughness: 0.4 },
+  "brass-hub": { color: 0xb89a55, metalness: 0.8, roughness: 0.4 },
+  "brass-lever": { color: 0xb89a55, metalness: 0.8, roughness: 0.4 },
+  "brass-spoke": { color: 0xb89a55, metalness: 0.8, roughness: 0.4 },
+  "brass-plate": { color: 0xb89a55, metalness: 0.8, roughness: 0.4 },
   "brass-strip": { color: 0xb89a55, metalness: 0.8, roughness: 0.4 },
   "brass-lid": { color: 0xb89a55, metalness: 0.8, roughness: 0.4 },
   "brass-dark": { color: 0x6b5a33, metalness: 0.7, roughness: 0.55 },

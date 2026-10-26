@@ -325,9 +325,39 @@ float wFbm(vec3 p) {
 float wFbm2(vec3 p) {
   return 0.65 * wNoise(p) + 0.35 * wNoise(p * 2.07 + 5.3);
 }
-float wRidge(vec3 p, vec3 stretch) {
-  float n = wNoise(p * stretch);
-  return pow(1.0 - abs(2.0 * n - 1.0), 14.0);
+/** A texel of the noise texture, read exactly (the lattice value of cell c in layer k). */
+float wCell(vec2 c, float k) {
+  return texture(uWearNoise, (vec3(mod(c, 32.0), k) + 0.5) / 32.0).r;
+}
+/**
+ * One hairline scratch per cell at most: a short straight segment at a random angle, length and place inside its cell (so there is no
+ * lattice and no cut at the cell border). Its width is about 0.05 mm; farther away it fades into a faint sheen by its pixel coverage.
+ */
+float wScratchLayer(vec2 q, float cell, float seed, float flow) {
+  vec2 cq = q / cell;
+  vec2 c = floor(cq);
+  vec2 f = fract(cq);
+  float present = step(0.55, wCell(c, seed));
+  float r1 = wCell(c, seed + 1.0);
+  // most scratches of a neighbourhood run the same way (the way the plate was rubbed), a few cross them
+  float a = r1 < 0.8 ? flow + (r1 / 0.8 - 0.5) * 0.7 : r1 * 3.14159;
+  vec2 dir = vec2(cos(a), sin(a));
+  float halfLen = mix(0.14, 0.4, wCell(c, seed + 2.0));
+  vec2 centre = vec2(0.5) + (vec2(wCell(c, seed + 3.0), wCell(c, seed + 4.0)) - 0.5) * 0.2;
+  vec2 p = f - centre;
+  float t = clamp(dot(p, dir), -halfLen, halfLen);
+  float d = length(p - dir * t) * cell;
+  float px = length(fwidth(q));
+  float strength = wCell(c, seed + 5.0);
+  float w = mix(0.015, 0.045, strength);
+  float taper = 1.0 - smoothstep(0.55, 1.0, abs(t) / halfLen);
+  return (1.0 - smoothstep(0.5 * w, w + px, d)) * w / (w + px) * present * taper * (0.25 + 0.75 * strength * strength);
+}
+float wScratches(vec3 pos, vec3 n, float scale) {
+  vec3 an = abs(n);
+  vec2 q = an.z > 0.6 ? pos.xy : (an.y > an.x ? pos.xz : pos.yz);
+  float flow = wFbm(vec3(q * 0.05, 5.0)) * 9.0;
+  return max(max(wScratchLayer(q, 3.2 / scale, 0.0, flow), wScratchLayer(q + 17.3, 1.7 / scale, 8.0, flow)), wScratchLayer(q + 41.9, 5.5 / scale, 16.0, flow));
 }
 vec3 wearPerturb(vec3 surfPos, vec3 surfNorm, vec2 dH, float faceDirection) {
   vec3 sx = normalize(dFdx(surfPos));
@@ -418,7 +448,7 @@ if (uScan2On > 0.0) {
 #endif
 float wearPx = length(fwidth(vWearPos));
 float wearBrushFade = 1.0 - smoothstep(0.02, 0.12, wearPx * uBrushScale * 6.0);
-float wearScratchFade = 1.0 - smoothstep(0.15, 0.6, wearPx * uScratchScale * 14.0);
+float wearScratchFade = 1.0 - smoothstep(0.04, 0.2, wearPx); // hairlines are gone beyond ~0.2 mm per pixel: no glitter at a distance
 float wearBrush = 0.5;
 #ifdef W_BRUSH
 vec3 wb = vWearPos * uBrushScale;
@@ -426,8 +456,7 @@ wearBrush = wNoise(wb * uBrushStretch * 6.0 + vec3(3.1)) * 0.65 + wNoise(wb * uB
 #endif
 float wearScratch = 0.0;
 #ifdef W_SCRATCH
-vec3 sp = vWearPos * uScratchScale;
-wearScratch = max(max(wRidge(sp * 3.0, vec3(0.05, 1.0, 1.0)), wRidge(sp * 3.0 + 5.0, vec3(1.0, 0.05, 1.0))), wRidge(sp * 2.0 + 9.0, vec3(0.3, 0.3, 0.02)));
+wearScratch = wScratches(vWearPos, wScanN, uScratchScale);
 float wearCluster = smoothstep(0.25, 0.6, wFbm(vWearPos * 0.07 + 4.0));
 wearScratch = wearScratch * wearCluster * uScratchAmount * wearScratchFade;
 #endif
@@ -446,7 +475,7 @@ wearTint = (wFbm(vWearPos * 0.03 + 60.0) - 0.5) * uTint;
 diffuseColor.rgb *= 1.0 + wearTint;
 diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * uGrimeColor * 3.2, clamp(wearGrime, 0.0, 1.0));
 diffuseColor.rgb = mix(diffuseColor.rgb, uPatinaColor, clamp(wearPatina, 0.0, 0.85));
-diffuseColor.rgb += wearScratch * 0.4 * (1.0 - 0.6 * wearGrime);
+diffuseColor.rgb += wearScratch * 0.12 * (1.0 - 0.6 * wearGrime);
 float wearEdge = 0.0;
 float wearEdgeDist = min(min(vWearUv.x, 1.0 - vWearUv.x) * uFaceSize.x, min(vWearUv.y, 1.0 - vWearUv.y) * uFaceSize.y);
 #ifdef W_CORNER
