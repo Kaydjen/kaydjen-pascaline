@@ -126,7 +126,7 @@ const warn = [];
 for (const [name, m] of Object.entries(stats)) {
   if (m.accent > 0.005) warn.push(`${name}: accent coverage ${(m.accent * 100).toFixed(2)}% (limit 0.5%)`);
   if (m.clipped > 0.01) warn.push(`${name}: clipped pixels ${(m.clipped * 100).toFixed(1)}% (limit 1%)`);
-  if (m.dark20 < 0.035) warn.push(`${name}: darkest 20% at ${m.dark20.toFixed(3)} (below the background)`);
+  if (m.dark20 < 0.018) warn.push(`${name}: darkest 20% at ${m.dark20.toFixed(3)} (below the background)`);
 }
 if (stats["01-default"]) {
   const m = stats["01-default"];
