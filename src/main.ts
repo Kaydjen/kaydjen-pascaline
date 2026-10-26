@@ -33,7 +33,7 @@ async function start(): Promise<void> {
   performance.mark("textures");
   // ?plain skips the finished look (plain materials, plain render)
   const look = useBox || query.has("plain") ? null : installLook(FINAL_LOOK);
-  const session = useBox ? null : createPrototype(levels, query.get("lid") !== "0");
+  const session = useBox ? null : createPrototype(levels, query.get("lid") !== "0", !query.has("nomerge")) // ?nomerge keeps the meshes apart so that scripts/sheet.mjs can edit geometry;
   performance.mark("assembly");
   const stage = createStage(canvas, showFatal, session ? session.content : boxContent(), { compileTarget: look?.compileTarget });
   if (stage && session) {

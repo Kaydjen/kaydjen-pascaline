@@ -37,7 +37,7 @@ export interface PrototypeSession {
   readonly assembly: Assembly;
 }
 
-export function createPrototype(levelCount: number, lidOn = true): PrototypeSession {
+export function createPrototype(levelCount: number, lidOn = true, merge = true): PrototypeSession {
   const spread = levelCount * DEFAULT_PARAMS.levelPitch;
   const root = new Group();
   const clock = new Clock();
@@ -68,7 +68,7 @@ export function createPrototype(levelCount: number, lidOn = true): PrototypeSess
       session.mechanism = new Mechanism({ levelCount });
       if (digits) session.mechanism.presetDigits(digits);
       view.root.removeFromParent();
-      view = new Assembly(session.mechanism, { merge: true });
+      view = new Assembly(session.mechanism, { merge });
       view.setVisibleRow(row, true);
       applyCovers();
       view.setTeardown(teardown);
@@ -125,7 +125,7 @@ export function createPrototype(levelCount: number, lidOn = true): PrototypeSess
       },
     },
   };
-  view = new Assembly(session.mechanism, { merge: true });
+  view = new Assembly(session.mechanism, { merge });
   applyCovers();
   root.add(view.root);
   previous = currentPose(session.mechanism);

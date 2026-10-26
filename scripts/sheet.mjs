@@ -2,7 +2,8 @@
 // Usage: npm run sheet -- --config=scripts/sheets/example.mjs [--out=file.png] [--w=500] [--variants=now,dark] [--views=front]
 // A config exports { views, variants }:
 //   views:    [{ name, pos: [x, y, z], target: [x, y, z], fov?, js?, photo? }]   (three coordinates: x, z + 30, -y of the spec; `js` runs in the page, `photo` is a path)
-//   variants: [{ name, note?, materials?: { "steel-ring": { scan: { tint: "#3a3228" } } }, grime?, ao? }]   (values are relative to the shipped look; a material not named is restored)
+//   (a variant `js` runs in the page too, after the materials: for geometry variants that have no run-time switch)
+//   variants: [{ name, note?, js?, materials?: { "steel-ring": { scan: { tint: "#3a3228" } } }, grime?, ao? }]   (values are relative to the shipped look; a material not named is restored)
 // Variants are switched at run time through the dev hook `__tune` (src/dev/tune.ts), so one page load serves the whole sheet.
 // A value that needs a shader feature the material was built without is reported ("needs ...") and shows nothing until it is in looks.ts.
 // Starts its own dev server (port 5196).
@@ -45,7 +46,7 @@ const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
 const errors = [];
 page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
 page.on("pageerror", (e) => errors.push(String(e)));
-await page.goto(`http://localhost:${port}/?levels=${flag("levels") ?? 6}`, { waitUntil: "load" });
+await page.goto(`http://localhost:${port}/?levels=${flag("levels") ?? 6}${config.nomerge ? "&nomerge" : ""}`, { waitUntil: "load" });
 await page.waitForFunction(() => window.__stage && window.__tune && window.__proto, null, { timeout: 90000 });
 await page.waitForFunction(() => document.getElementById("scene")?.classList.contains("ready"), null, { timeout: 90000 });
 await page.addStyleTag({ content: "body > *:not(canvas) { display: none !important; }" });
@@ -85,6 +86,7 @@ for (const [row, view] of views.entries()) {
           const r = await window.__tune.material(name, v.materials?.[name] ?? {});
           if (r.missing.length) lacking.push(`${name}: ${r.missing.join(",")}`);
         }
+        if (v.js) eval(v.js);
         if (v.grime) window.__tune.grime(v.grime);
         if (v.ao) window.__tune.ao(v.ao);
         return lacking;
