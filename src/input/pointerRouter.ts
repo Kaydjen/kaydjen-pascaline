@@ -1,4 +1,4 @@
-import { Vector2 } from "three";
+import { Vector2, Vector3 } from "three";
 import { NO_LID_S } from "../scene/teardown";
 import type { PrototypeSession } from "../scene/prototype";
 import type { Stage } from "../scene/stage";
@@ -219,6 +219,10 @@ export class PointerRouter {
       } else if (!player.active) this.takeWhenClosed = false; // the closing was interrupted
     }
     this.hovered = this.inside ? this.pick() : null;
+    // a soft light on the part under the pointer (not on a wheel while the stylus is in the hand: its tip already shows the place)
+    const name = this.hovered?.name;
+    const lit = name !== undefined && !this.stripGrab?.active && (name.startsWith("pin:") || isStripHandle(name) || (!(stylus.state === "hand" || stylus.state === "inserted") && (name.startsWith("wheel:") || name.startsWith("gear:"))));
+    this.ctx.session.assembly.setHover(lit ? name! : null, lit ? (name!.startsWith("strip") || name!.startsWith("barrel") ? this.hovered!.point : this.hovered!.object.getWorldPosition(new Vector3())) : undefined);
     // the stylus in the hand is the pointer: no system cursor then; while it rests on its stand the cursor is there to find it
     const inHand = (stylus.state === "hand" || stylus.state === "inserted") && !this.uiZone;
     // lid up: the stylus rests, the pointer itself grabs wheels and gears

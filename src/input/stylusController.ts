@@ -16,8 +16,10 @@ import {
   hoverZ,
   nearestGearGap,
   nearestWheelGap,
+  nearestWheelTipGap,
   STOP_ANGLE,
   wheelGapAngle,
+  wheelTipAngle,
   type Dial,
   type DialKind,
 } from "./dialing";
@@ -43,6 +45,9 @@ const STIFFNESS = 180;
 const STIFFNESS_INSERTED = 1600;
 const TAKEN_KEY = "pascaline.stylusTaken";
 const Y = new Vector3(0, 1, 0);
+/** Lean of a free stylus per mm/s of tip speed, and its limit. */
+const LEAN_PER_SPEED = 0.0012;
+const MAX_LEAN = 0.3;
 /** Orientation of the parked stylus: the knob (local +y) points to -y, towards the wheels. */
 const PARKED_QUATERNION = new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1), Math.PI);
 
@@ -149,7 +154,7 @@ export class StylusController implements StylusSource {
     void hit;
     if (this.cursorMode) {
       if (this.over && !this.cursorDrag) {
-        this.startDrag(this.over.dial, this.over.gap);
+        this.startDrag(this.over.dial, this.over.gap, false);
         this.cursorDrag = true;
         return true;
       }
@@ -180,18 +185,21 @@ export class StylusController implements StylusSource {
   }
 
   private insert(dial: Dial, gap: number): void {
-    this.startDrag(dial, gap);
+    this.startDrag(dial, gap, true);
     this.pressed = true;
     this.state = "inserted";
   }
 
-  private startDrag(dial: Dial, gap: number): void {
+  private startDrag(dial: Dial, gap: number, stylus: boolean): void {
     const u = this.host.mechanism().levels[dial.level]!.u;
     const gapAngle = dial.kind === "wheel" ? wheelGapAngle(gap, u) : gearGapAngle(gap, u);
     const lastAngle = this.pointerAngle(dial) ?? gapAngle;
     // a lid wheel stops when the gap meets the stop lever; gear 45 has no stop (several digits per drag)
     const maxDeg = dial.kind === "wheel" ? ((STOP_ANGLE - gapAngle + 720) % 360) : Infinity;
-    this.drag = { dial, gap, anchorU: u, lastAngle, swept: 0, effective: 0, maxDeg, s: this.host.teardown() };
+    // the stylus tip stands a little off the pointer: when the pointer is ahead of it the tip is pressed on to the pointer at once,
+    // when it is behind the pointer has to catch up before the wheel moves
+    const lead = stylus && dial.kind === "wheel" ? (angleDelta(wheelTipAngle(gap, u), this.pointerAngle(dial) ?? gapAngle)) : 0;
+    this.drag = { dial, gap, anchorU: u, lastAngle, swept: lead, effective: 0, maxDeg, s: this.host.teardown() };
   }
 
   /** Follows the pointer about the dial axis: the dial only turns forward and no further than its stop. */
@@ -246,7 +254,8 @@ export class StylusController implements StylusSource {
     const angle = this.pointerAngle(dial);
     if (angle === null) return;
     const u = this.host.mechanism().levels[level]!.u;
-    const gap = kind === "wheel" ? nearestWheelGap(angle, u) : nearestGearGap(angle, u);
+    // with the stylus the gap is chosen by where its tip would stand; the bare pointer simply takes the gap nearest to it
+    const gap = kind === "wheel" ? (this.cursorMode ? nearestWheelGap(angle, u) : nearestWheelTipGap(angle, u)) : nearestGearGap(angle, u);
     this.over = { dial, gap };
   }
 
@@ -333,7 +342,11 @@ export class StylusController implements StylusSource {
       this.velocity.addScaledVector(target.clone().sub(this.position), stiffness * h).addScaledVector(this.velocity, -damping * h);
       this.position.addScaledVector(this.velocity, h);
     }
-    this.orientation.slerp(wanted ?? new Quaternion().setFromUnitVectors(Y, axis), 1 - Math.exp(-step * 12));
+    // a free stylus trails its knob behind the tip while the hand moves (the tip leads)
+    const lean = new Vector3();
+    if (this.state === "hand" && !this.over) lean.copy(this.velocity).multiplyScalar(-LEAN_PER_SPEED).clampLength(0, MAX_LEAN);
+    const pointing = lean.lengthSq() > 0 ? axis.clone().add(lean).normalize() : axis;
+    this.orientation.slerp(wanted ?? new Quaternion().setFromUnitVectors(Y, pointing), 1 - Math.exp(-step * 12));
     assembly.stylusParked = false;
     assembly.stylus.position.copy(this.position);
     assembly.stylus.quaternion.copy(this.orientation);

@@ -1,4 +1,4 @@
-import { HalfFloatType, Mesh, type MeshBasicMaterial, NoBlending, PlaneGeometry, Scene, ShaderMaterial, Vector2, WebGLRenderTarget, type WebGLRenderer } from "three";
+import { HalfFloatType, Mesh, type MeshBasicMaterial, NoBlending, type Object3D, PlaneGeometry, Scene, ShaderMaterial, type Sprite, Vector2, WebGLRenderTarget, type WebGLRenderer } from "three";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { GTAOPass } from "three/examples/jsm/postprocessing/GTAOPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
@@ -80,6 +80,19 @@ export function installAo(debug: StageDebug, settings: AoSettings, target: WebGL
     blend.uniforms.tScene!.value = readBuffer.texture;
     blend.uniforms.intensity!.value = gtao.blendIntensity;
     render(r, writeBuffer, readBuffer, delta, mask);
+  };
+  // the glow sprites (stand, contact lamps, hover, windows) are light, not surfaces: left in the occlusion pass they were drawn as flat quads
+  // and cleared the occlusion in a square around them (the pass already leaves out points and lines the same way)
+  const hooks = gtao as unknown as { _overrideVisibility(): void; _visibilityCache: Object3D[] };
+  const hideLines = hooks._overrideVisibility.bind(gtao);
+  hooks._overrideVisibility = () => {
+    hideLines();
+    scene.traverse((o) => {
+      if ((o as Sprite).isSprite && o.visible) {
+        o.visible = false;
+        hooks._visibilityCache.push(o);
+      }
+    });
   };
   composer.addPass(gtao);
   composer.addPass(new OutputPass());

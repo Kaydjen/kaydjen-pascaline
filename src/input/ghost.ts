@@ -10,7 +10,7 @@ import {
   nearestGearGap,
   nearestWheelGap,
   WHEEL_TIP_RADIUS,
-  wheelGapAngle,
+  wheelTipAngle,
   type Dial,
 } from "./dialing";
 import type { StylusController } from "./stylusController";
@@ -162,7 +162,7 @@ export class Ghost {
     // the gap to start from: at the numeral that is `steps` short of the stop (wheel), or the gap nearest the top (gear 45)
     const wanted = dial.kind === "wheel" ? 180 - steps * STEP_DEG : 0;
     const gap = dial.kind === "wheel" ? nearestWheelGap(wanted, u) : nearestGearGap(wanted, u);
-    const startAngle = dial.kind === "wheel" ? wheelGapAngle(gap, u) : gearGapAngle(gap, u);
+    const startAngle = dial.kind === "wheel" ? wheelTipAngle(gap, u) : gearGapAngle(gap, u); // the pointer starts where the tip will stand
     const radius = dial.kind === "wheel" ? WHEEL_TIP_RADIUS : DIM.pinCircleRadius;
     const pointAt = (angle: number): Vector3 => {
       const a = (angle * Math.PI) / 180;

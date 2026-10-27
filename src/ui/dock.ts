@@ -95,11 +95,11 @@ export function mountDock(ctx: DockContext): Dock {
   syncSpeeds();
 
   const button = (label: string, onClick: () => void): HTMLButtonElement => {
-    const b = el("button", { class: "text", text: label, attrs: { type: "button" } });
+    const b = el("button", { class: "text boxed", text: label, attrs: { type: "button" } });
     b.addEventListener("click", onClick);
     return b;
   };
-  const demo = button("999 + 1", ctx.demo);
+  const demo = button("Demo", ctx.demo);
   const zero = button("Reset", ctx.zero);
   const names = button("Names", () => {
     ctx.names.set(!ctx.names.get());
@@ -121,6 +121,7 @@ export function mountDock(ctx: DockContext): Dock {
   });
   document.body.append(bar);
 
+  let wasOpen = false;
   return {
     update() {
       const goal = player.target;
@@ -131,6 +132,12 @@ export function mountDock(ctx: DockContext): Dock {
       view.select(nearest);
       mode.select(session.visibleRow === "ascending" ? 0 : 1);
       // pause and the speeds are there only while something moves, when time is not running normally, or when the machine is apart
+      // back in the closed view the time controls are reset and go away: nothing runs slowly or stays paused behind hidden buttons
+      if (goal >= ASSEMBLED_S) wasOpen = true;
+      else if (wasOpen && !player.active) {
+        wasOpen = false;
+        if (time.paused || time.speed !== 1) time.setSpeed(1);
+      }
       const show = goal >= ASSEMBLED_S || ctx.busy() || player.active || ctx.time.paused || ctx.time.speed !== 1;
       timeBox.classList.toggle("shown", show);
     },

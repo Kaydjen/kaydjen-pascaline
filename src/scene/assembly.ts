@@ -1,7 +1,8 @@
-import { AdditiveBlending, CanvasTexture, Color, Group, Mesh, type Object3D, Sprite, SpriteMaterial } from "three";
+import { AdditiveBlending, CanvasTexture, Color, Group, Mesh, type Object3D, Sprite, SpriteMaterial, type Vector3 } from "three";
+import { createDust } from "./dust";
 import { Mechanism } from "../sim/mechanism";
 import { STEP_DEG } from "../sim/params";
-import { BAR_TRAVEL, CASE_Y_BACK, CASE_Y_FRONT, CASE_Z_BOTTOM, COVER_WALLS, LABEL_Y_FROM, LABEL_Y_TO, LID_BOTTOM, LID_TOP, STRIP_CENTRE_Y, STRIP_LENGTH, type WallName } from "../parts/case";
+import { BAR_TRAVEL, CASE_Y_BACK, CASE_Y_FRONT, CASE_Z_BOTTOM, COVER_WALLS, LABEL_Y_FROM, LABEL_Y_TO, LID_BOTTOM, LID_TOP, STRIP_CENTRE_Y, STRIP_LENGTH, type WallName, WINDOW_Y_FROM, WINDOW_Y_TO } from "../parts/case";
 import { buildBox, outerHalfWidth, type BoxParts } from "../parts/boxCase";
 import { buildLid, type LidParts } from "../parts/lid";
 import { buildCarry, buildPawl, poseCarry, type CarryParts } from "../parts/carry";
@@ -25,6 +26,10 @@ const PANEL_DAMPING = 2 * 0.7 * PANEL_OMEGA;
 const PANEL_MAX_DT = 1 / 20;
 /** How far a lid pin rises when it is pulled out, mm. */
 const PIN_PULL = 7;
+const PIN_STIFFNESS = 900;
+const PIN_DAMPING = 2 * 0.42 * Math.sqrt(PIN_STIFFNESS);
+/** How far each pin leans when it is out, radians. */
+const PIN_TILT = [0.16, -0.12, 0.1, -0.18];
 const ACCENT = 0x5fb3a1;
 
 /** Soft round glow for the contact lamps (accent colour, additive, shown only while a contact works). */
@@ -88,6 +93,11 @@ export class Assembly {
   /** First visit: the stand breathes quietly until the stylus is taken for the first time. Set by the stylus controller. */
   standHint = false;
   private standGlow!: Sprite;
+  /** Soft light on the part under the pointer (wheel, gear, pin, strip), and a brief flash in a window when its digit changes. */
+  private hoverGlow!: Sprite;
+  private hoverWanted = 0;
+  private readonly digitGlows: { sprite: Sprite; last: number; strength: number }[] = [];
+  private readonly dust = createDust();
   private standClock = 0;
   private readonly levels: LevelParts[] = [];
   private readonly bounce: { t: number; amp: number; previous: number }[] = [];
@@ -153,6 +163,26 @@ export class Assembly {
     this.standGlow = new Sprite(new SpriteMaterial({ map: glowTexture(), color: new Color(0xb8924a).multiplyScalar(2.2), blending: AdditiveBlending, transparent: true, depthWrite: false, toneMapped: false, opacity: 0 }));
     this.standGlow.scale.set(40, 40, 1);
     this.standGlow.position.set(0, 0, standPlacement(this.levelHalfSpan()).restZ - standPlacement(this.levelHalfSpan()).tableZ);
+    const warm = new Color(0xb8924a);
+    const glowMap = glowTexture();
+    const lamp = (strength: number): Sprite => {
+      const sprite = new Sprite(new SpriteMaterial({ map: glowMap, color: warm.clone().multiplyScalar(strength), blending: AdditiveBlending, transparent: true, depthWrite: false, toneMapped: false, opacity: 0 }));
+      sprite.visible = false; // shown only while it glows (the stand glow keeps the shared sprite program compiled)
+      sprite.renderOrder = 10;
+      return sprite;
+    };
+    this.hoverGlow = lamp(1.6);
+    this.hoverGlow.material.depthTest = false;
+    this.machine.add(this.hoverGlow);
+    for (let i = 0; i < n; i++) {
+      const sprite = lamp(2.2);
+      sprite.scale.set(15, 11, 1);
+      sprite.position.set(((n - 1) / 2 - i) * params.levelPitch, (WINDOW_Y_FROM + WINDOW_Y_TO) / 2, LID_TOP + 0.7);
+      this.lidAssembly.add(sprite);
+      this.digitGlows.push({ sprite, last: -1, strength: 0 });
+    }
+    this.dust.points.visible = typeof location === "undefined" || !new URLSearchParams(location.search).has("still"); // ?still: a steady frame for the comparison shots
+    this.root.add(this.dust.points);
     stand.add(this.standGlow); // always "visible" at opacity 0: its shader program is built with the others, not at the first breath
     const standAt = standPlacement(this.levelHalfSpan());
     stand.position.set(standAt.x, standAt.y, standAt.tableZ);
@@ -178,7 +208,39 @@ export class Assembly {
   /** The four locating pins of the lid (clicked out one by one), their wanted state and how far each is pulled up now, mm. */
   private readonly pinOut = [false, false, false, false];
   private readonly pinLift = [0, 0, 0, 0];
+  private readonly pinSpeed = [0, 0, 0, 0];
   private lidWasUp = false;
+
+  /** The pointer is over a part: a soft light grows on it. `point` is a world position on it; null clears. */
+  setHover(name: string | null, point?: Vector3): void {
+    if (!name || !point) {
+      this.hoverWanted = 0;
+      return;
+    }
+    const size = name.startsWith("wheel:") ? 38 : name.startsWith("gear:") ? 34 : name.startsWith("pin:") ? 15 : 17;
+    this.hoverGlow.scale.set(size, size, 1);
+    this.hoverGlow.position.copy(this.machine.worldToLocal(point.clone()));
+    this.hoverWanted = name.startsWith("pin:") ? 0.18 : 0.14;
+  }
+
+  private updateLamps(dt: number): void {
+    const glow = this.hoverGlow;
+    glow.material.opacity += (this.hoverWanted - glow.material.opacity) * (1 - Math.exp(-Math.max(dt, 0) / 0.12));
+    if (this.hoverWanted === 0 && glow.material.opacity < 0.004) glow.material.opacity = 0;
+    glow.visible = glow.material.opacity > 0;
+    this.digitGlows.forEach((entry, i) => {
+      const digit = this.mechanism.digit(i);
+      if (entry.last < 0) entry.last = digit;
+      else if (digit !== entry.last) {
+        entry.last = digit;
+        entry.strength = 1;
+      }
+      entry.strength = Math.max(0, entry.strength - Math.max(dt, 0) / 0.8);
+      entry.sprite.material.opacity = 0.55 * entry.strength * entry.strength;
+      entry.sprite.visible = entry.strength > 0;
+    });
+    this.dust.update(dt);
+  }
 
   /** Pulls a lid pin out (or pushes it back); returns how many pins are out now. */
   togglePin(k: number): number {
@@ -193,12 +255,33 @@ export class Assembly {
       this.lidWasUp = false;
       this.pinOut.fill(false);
     }
+    const span = Math.min(Math.max(dt, 0), 1 / 20);
+    const substeps = Math.max(1, Math.ceil(span * 240));
     this.pinLift.forEach((lift, k) => {
       const wanted = this.pinOut[k] ? PIN_PULL : 0;
-      const next = Math.abs(wanted - lift) < 0.01 ? wanted : lift + (wanted - lift) * (1 - Math.exp(-Math.max(dt, 0) / 0.09));
-      this.pinLift[k] = next;
+      // a lightly damped spring: the pin overshoots a little going out and bounces once on the lid when it is pushed back
+      let position = lift;
+      let speed = this.pinSpeed[k]!;
+      for (let i = 0; i < substeps; i++) {
+        const h = span / substeps;
+        speed += (PIN_STIFFNESS * (wanted - position) - PIN_DAMPING * speed) * h;
+        position += speed * h;
+        if (position < 0) {
+          position = 0;
+          speed = Math.abs(speed) * 0.35;
+        }
+      }
+      if (Math.abs(wanted - position) < 0.004 && Math.abs(speed) < 0.05) {
+        position = wanted;
+        speed = 0;
+      }
+      this.pinLift[k] = position;
+      this.pinSpeed[k] = speed;
       const clip = this.lidParts.lid.getObjectByName(`lidClip:${k}`);
-      if (clip) clip.position.z = LID_TOP + next;
+      if (clip) {
+        clip.position.z = LID_TOP + position;
+        clip.rotation.x = PIN_TILT[k]! * Math.min(position / PIN_PULL, 1.2); // a pin that is out leans a little: it is loose
+      }
     });
   }
 
@@ -295,7 +378,9 @@ export class Assembly {
 
   /** Holds the sliding strip at `offset` (clamped to its travel) while the pointer drags it; null lets the spring take it to the wanted stop. */
   holdPanel(offset: number | null): void {
-    this.panelHeld = offset === null ? null : Math.min(Math.max(offset, -BAR_TRAVEL), BAR_TRAVEL);
+    // past the ends of its travel the strip gives a little (up to 0.45 mm) instead of stopping dead, and springs back on release
+    const over = offset === null ? 0 : Math.abs(offset) - BAR_TRAVEL;
+    this.panelHeld = offset === null ? null : over <= 0 ? offset : Math.sign(offset) * (BAR_TRAVEL + 0.45 * Math.tanh(over / 1.5));
   }
 
   private panelHeld: number | null = null;
@@ -392,6 +477,7 @@ export class Assembly {
     this.lidParts.slider.position.y = this.panelOffset;
 
     this.updatePins(dt);
+    this.updateLamps(dt);
     const glowMaterial = this.standGlow.material;
     if (!this.standHint) this.standClock = 0; // the breathing starts from its dimmest point whenever it (re)starts
     else this.standClock += Math.max(dt, 0);

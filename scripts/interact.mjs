@@ -264,7 +264,7 @@ check("a double click on the background keeps the camera working", await page.ev
 const waitIdle = (ms = 90000) => page.waitForFunction(() => window.__app.ghost.running === null, null, { timeout: ms });
 await page.evaluate(() => window.__proto.reset([3, 7, 2, 9, 0, 5]));
 await page.waitForTimeout(500);
-await page.click("text=999 + 1");
+await page.click("text=Demo");
 await waitIdle();
 await page.waitForTimeout(1500);
 d = await digits();
@@ -286,9 +286,9 @@ check("zero while apart (s = 0.4, gear 45) ends at 000000", d.every((x) => x ===
 await page.screenshot({ path: join(out, "04-zero-apart.png") });
 await page.evaluate(() => window.__proto.setTeardown(0));
 await page.waitForTimeout(2500);
-await page.click("text=999 + 1");
+await page.click("text=Demo");
 await page.waitForTimeout(4000);
-check("demo is running (the word turns accent)", await page.evaluate(() => document.querySelector(".dock button.accent")?.textContent === "999 + 1"));
+check("demo is running (the word turns accent)", await page.evaluate(() => document.querySelector(".dock button.accent")?.textContent === "Demo"));
 await page.mouse.click(300, 600);
 await page.waitForTimeout(400);
 check("a click cancels the demo", await page.evaluate(() => window.__app.ghost.running === null));

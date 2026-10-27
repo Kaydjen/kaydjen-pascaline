@@ -106,6 +106,20 @@ body {
   transition: color 160ms ease-out;
 }
 
+/* real buttons (Names, Demo, Reset): the same hairline frame as the view steps */
+.dock button.boxed {
+  padding: 8px 14px;
+  border: 1px solid rgba(184, 146, 74, 0.28);
+}
+
+.dock button.boxed:hover {
+  border-color: rgba(184, 146, 74, 0.6);
+}
+
+.dock button.boxed.on {
+  background: rgba(184, 146, 74, 0.12);
+}
+
 .dock button:hover {
   color: var(--text);
 }
@@ -157,37 +171,38 @@ body {
   position: fixed;
   left: 0;
   top: 0;
-  padding: 4px 11px 5px;
-  background: rgba(20, 18, 15, 0.92);
-  border: 1px solid rgba(184, 146, 74, 0.4);
-  color: #e8dfcf;
-  font: italic 16px/1.2 "EB Garamond Italic", serif;
+  padding: 7px 14px 8px;
+  background: rgba(30, 25, 19, 0.94);
+  border: 1px solid rgba(184, 146, 74, 0.5);
+  border-radius: 4px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55);
+  color: #eadfc8;
+  font: 18px/1.15 "EB Garamond", Georgia, serif;
+  letter-spacing: 0.02em;
   pointer-events: none;
   opacity: 0;
-  transition: opacity 100ms ease-in;
+  transition: opacity 120ms ease-in;
   white-space: nowrap;
+}
+
+/* the little tail towards the pointer */
+.chip::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -5px;
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
+  background: rgba(30, 25, 19, 0.94);
+  border-right: 1px solid rgba(184, 146, 74, 0.5);
+  border-bottom: 1px solid rgba(184, 146, 74, 0.5);
+  transform: rotate(45deg);
 }
 
 .chip.visible {
   opacity: 1;
-  transition-duration: 150ms;
-}
-
-.caption {
-  position: fixed;
-  left: 22px;
-  bottom: 64px;
-  margin: 0;
-  color: #cdbfa6;
-  font: italic 17px/1.2 "EB Garamond Italic", serif;
-  letter-spacing: 0.02em;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 200ms ease-out;
-}
-
-.caption.visible {
-  opacity: 0.85;
+  transition-duration: 160ms;
 }
 
 .dock .time {
@@ -245,6 +260,41 @@ body {
   animation-delay: 0.4s;
 }
 
+/* the name under the dots: a quiet title and the author in a dimmer, smaller line */
+.loading-title {
+  position: fixed;
+  left: 50%;
+  top: calc(50% + 34px);
+  transform: translateX(-50%);
+  text-align: center;
+  opacity: 0;
+  transition: opacity 400ms ease-out;
+  pointer-events: none;
+}
+
+.loading-title.shown {
+  opacity: 1;
+}
+
+.loading-title p {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.loading-title .name {
+  color: #cdbfa6;
+  font: 26px/1.2 "EB Garamond", Georgia, serif;
+  letter-spacing: 0.12em;
+}
+
+.loading-title .by {
+  margin-top: 6px;
+  color: var(--dim);
+  opacity: 0.7;
+  font: 13px/1.2 "EB Garamond", Georgia, serif;
+  letter-spacing: 0.1em;
+}
+
 @keyframes loading-fade {
   0%,
   100% {
@@ -277,8 +327,8 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .dock button,
   .chip,
-  .caption,
-  .loading-dots {
+  .loading-dots,
+  .loading-title {
     transition-duration: 1ms;
   }
 

@@ -14,8 +14,10 @@ export type DialKind = "wheel" | "gear";
 export const STOP_ANGLE = 180;
 /** Radius at which the stylus tip stands in a wheel gap, mm. */
 export const WHEEL_TIP_RADIUS = 11;
-/** Height of the stylus tip over the wheel's middle plane when it works between the spokes (below the spoke tops, above the lid), mm. */
-export const WHEEL_TIP_Z = 0;
+/** Height of the stylus tip over the lid top when it works between the spokes: the wheel's middle plane (the spoke tops stand 0.5 mm higher), mm. */
+export const WHEEL_TIP_Z = 0.9;
+/** How far higher the tip hovers over a gap before it is pressed in, mm (low: a high tip shifts on screen against the wheel). */
+export const WHEEL_HOVER_RISE = 2.4;
 /**
  * The tip does not stand in the middle of a gap: it leans on the spoke that it pushes (the one behind it, as the wheel turns
  * clockwise). At the tip radius a spoke edge is 9.25 degrees from the gap middle; the point's own radius takes about 2.5 more.
@@ -63,6 +65,12 @@ export const wheelGapAngle = (j: number, u: number): number => mod((j + u) * STE
 /** Gap of a wheel at position `u` that is nearest to the world angle `angle`. */
 export const nearestWheelGap = (angle: number, u: number): number => mod(Math.round(angle / STEP_DEG - u), DIM.pinCount);
 
+/** Gap whose tip (leaning on the spoke behind the gap) is nearest to the pointer angle: the stylus enters where it points. */
+export const nearestWheelTipGap = (angle: number, u: number): number => nearestWheelGap(angle + WHEEL_TIP_LEAD_DEG, u);
+
+/** World angle of the stylus tip while it works in gap `j` of a wheel. */
+export const wheelTipAngle = (j: number, u: number): number => mod(wheelGapAngle(j, u) - WHEEL_TIP_LEAD_DEG, 360);
+
 /** World angle of gap `j` between the pins of gear 45 at position `u`: pins at whole steps, gaps half a step later. */
 export const gearGapAngle = (j: number, u: number): number => mod((j + 0.5 + u) * STEP_DEG, 360);
 
@@ -84,7 +92,7 @@ export const angleDelta = (from: number, to: number): number => {
 };
 
 /** Stylus axis (from the tip towards the knob) when held over the lid and when working on gear 45. */
-export const AXIS_WHEEL = new Vector3(0.22, -0.5, 1).normalize();
+export const AXIS_WHEEL = new Vector3(0.1, -0.3, 1).normalize(); // about 17 degrees from upright: the visible end is the tip
 export const AXIS_GEAR = new Vector3(0.12, -0.62, 0.78).normalize();
 export const STYLUS_LENGTH_MM = 70;
 
@@ -93,7 +101,7 @@ export function gapTip(dial: Dial, gap: number, u: number, inserted: boolean): V
   const c = dial.centre;
   if (dial.kind === "wheel") {
     const a = ((wheelGapAngle(gap, u) - WHEEL_TIP_LEAD_DEG) * Math.PI) / 180;
-    return new Vector3(c.x + WHEEL_TIP_RADIUS * Math.sin(a), c.y + WHEEL_TIP_RADIUS * Math.cos(a), c.z + (inserted ? WHEEL_TIP_Z : WHEEL_TIP_Z + 5));
+    return new Vector3(c.x + WHEEL_TIP_RADIUS * Math.sin(a), c.y + WHEEL_TIP_RADIUS * Math.cos(a), c.z + (inserted ? WHEEL_TIP_Z : WHEEL_TIP_Z + WHEEL_HOVER_RISE));
   }
   const a = (gearGapAngle(gap, u) * Math.PI) / 180;
   const r = DIM.pinCircleRadius + (inserted ? 0 : 4);

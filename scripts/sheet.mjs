@@ -53,7 +53,7 @@ const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
 const errors = [];
 page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
 page.on("pageerror", (e) => errors.push(String(e)));
-await page.goto(`http://localhost:${port}/?levels=${flag("levels") ?? 6}${config.nomerge ? "&nomerge" : ""}${flag("query") ? "&" + flag("query") : ""}`, { waitUntil: "load" });
+await page.goto(`http://localhost:${port}/?levels=${flag("levels") ?? 6}&still${config.nomerge ? "&nomerge" : ""}${flag("query") ? "&" + flag("query") : ""}`, { waitUntil: "load" });
 await page.waitForFunction(() => window.__stage && window.__tune && window.__proto, null, { timeout: 90000 });
 await page.waitForFunction(() => document.getElementById("scene")?.classList.contains("ready"), null, { timeout: 90000 });
 await page.addStyleTag({ content: "body > *:not(canvas) { display: none !important; }" });

@@ -286,6 +286,9 @@ export function createStage(canvas: HTMLCanvasElement, onFatal: (message: string
   };
   let frameTime = 1 / 60;
   let slowFor = 0;
+  /** The lamp is a flame: its light wavers by about one per cent, slowly (`?still` keeps it steady). */
+  const steady = typeof location !== "undefined" && new URLSearchParams(location.search).has("still");
+  const flicker = (seconds: number): number => (steady ? 0 : 0.006 * Math.sin(seconds * 2.3) + 0.004 * Math.sin(seconds * 3.7 + 1.3) + 0.003 * Math.sin(seconds * 6.1 + 4.0));
   const frame = (now: number): void => {
     handle = requestAnimationFrame(frame);
     const delta = (now - last) / 1000;
@@ -315,7 +318,7 @@ export function createStage(canvas: HTMLCanvasElement, onFatal: (message: string
     key.position.copy(controls.target).add(keyOffset);
     // the reveal is a brightness ramp inside the frame: a CSS fade over a 4K canvas halved the frame rate of a laptop GPU while it ran
     const exposure = renderer.toneMappingExposure;
-    renderer.toneMappingExposure = exposure * debug.fade;
+    renderer.toneMappingExposure = exposure * debug.fade * (1 + flicker(now / 1000));
     if (debug.postRender) debug.postRender(delta);
     else renderer.render(scene, camera);
     renderer.toneMappingExposure = exposure;
