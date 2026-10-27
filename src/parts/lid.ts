@@ -21,9 +21,9 @@ import {
 } from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { getMaterial } from "../materials/factory";
-import { FONT_LABEL, FONT_NUMERAL } from "../materials/fonts";
+import { FONT_LABEL } from "../materials/fonts";
 import { STEP_DEG } from "../sim/params";
-import { at, box, forgedBox, named } from "./common";
+import { at, forgedBox, named } from "./common";
 import {
   BAR_TRAVEL,
   BARREL_INNER,
@@ -66,10 +66,12 @@ const CROWN_PLATE_SHIFT_MIN = 0.3;
 const CROWN_PLATE_SHIFT_MAX = 0.7;
 /** Along the row the shift is capped so that neighbouring plates, which nearly touch at the junction, never overlap. */
 const CROWN_PLATE_SHIFT_MAX_X = 0.4;
-/** The window opening widens towards the top: extra margin at the front (the lid edge must not clip a digit seen from the default camera), the sides and the back. */
-const WINDOW_BEVEL_FRONT = 2.6;
-const WINDOW_BEVEL_SIDE = 0.4;
-const WINDOW_BEVEL_BACK = 0.2;
+/**
+ * The window has straight side and back walls (photo IMG_6514) and a thin chamfer round its top edge that catches the light. The wall towards the
+ * front is sloped instead: a digit seen from the default camera must not be hidden by the lid edge.
+ */
+const WINDOW_CHAMFER = 0.4;
+const WINDOW_FRONT_SLOPE = 2.6;
 
 function canvasTexture(width: number, height: number, draw: (ctx: CanvasRenderingContext2D) => void): CanvasTexture | null {
   if (typeof document === "undefined") return null; // headless tests build the view without a canvas
@@ -138,7 +140,7 @@ function crownTexture(inner: number, outer: number, bump: boolean): CanvasTextur
         });
         ctx.filter = "blur(0.8px)";
       } else {
-        ctx.fillStyle = `rgba(28,22,16,${(0.2 + 0.4 * depth).toFixed(2)})`;
+        ctx.fillStyle = `rgba(8,5,3,${(0.5 + 0.3 * depth).toFixed(2)})`;
         draw();
       }
     };
@@ -148,7 +150,7 @@ function crownTexture(inner: number, outer: number, bump: boolean): CanvasTextur
       ctx.save();
       ctx.translate(size / 2 + radius * Math.sin(a), size / 2 - radius * Math.cos(a));
       ctx.rotate(numeralRotation(a) + jitter(3) * RAD);
-      ctx.font = `${Math.round(3.2 * pxPerMm * (1 + jitter(0.06)))}px ${FONT_NUMERAL}`;
+      ctx.font = `${Math.round(3.2 * pxPerMm * (1 + jitter(0.06)))}px ${FONT_LABEL}`;
       const dx = jitter(0.15) * pxPerMm;
       engraveGlyph(() => ctx.fillText(String(d), dx, 0.1 * pxPerMm));
       ctx.restore();
@@ -191,15 +193,27 @@ function flatRing(inner: number, outer: number, z0: number, z1: number, chamfer:
 function labelTexture(width: number, height: number, levelCount: number, levelX: (i: number) => number): CanvasTexture | null {
   const pxPerMm = 12;
   return canvasTexture(Math.round(width * pxPerMm), Math.round(height * pxPerMm), (ctx) => {
-    ctx.fillStyle = "#3b2c14";
-    ctx.font = `${Math.round(3.6 * pxPerMm)}px ${FONT_LABEL}`;
+    ctx.font = `${Math.round(3.2 * pxPerMm)}px ${FONT_LABEL}`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    for (let i = 0; i < levelCount; i++) {
-      const lines = LABELS[i]!.split("\n");
-      const x = (levelX(i) + width / 2) * pxPerMm;
-      lines.forEach((line, k) => ctx.fillText(line, x, (height / 2) * pxPerMm + (k - (lines.length - 1) / 2) * 4.2 * pxPerMm));
-    }
+    ctx.lineJoin = "round";
+    // a cut letter: near-black groove, and a thin bright burr along its lower edge where the graver lifted the metal
+    const paint = (dx: number, dy: number, fill: string, stroke: number): void => {
+      ctx.fillStyle = fill;
+      ctx.strokeStyle = fill;
+      ctx.lineWidth = stroke * pxPerMm;
+      for (let i = 0; i < levelCount; i++) {
+        const lines = LABELS[i]!.split("\n");
+        const x = (levelX(i) + width / 2 + dx) * pxPerMm;
+        lines.forEach((line, k) => {
+          const y = (height / 2 + dy) * pxPerMm + (k - (lines.length - 1) / 2) * 3.5 * pxPerMm;
+          if (stroke > 0) ctx.strokeText(line, x, y);
+          ctx.fillText(line, x, y);
+        });
+      }
+    };
+    paint(0, 0.1, "rgba(236, 206, 128, 0.22)", 0);
+    paint(0, 0, "#080503", 0.06);
   });
 }
 
@@ -236,13 +250,6 @@ function annulus(inner: number, outer: number): Shape {
   hole.absarc(0, 0, inner, 0, Math.PI * 2, true);
   shape.holes.push(hole);
   return shape;
-}
-
-/** Octagonal bolt head standing on the lid (axis z). */
-function bolt(mat: Material, radius: number, height: number): Mesh {
-  const mesh = new Mesh(new CylinderGeometry(radius, radius, height, 8), mat);
-  mesh.rotation.x = Math.PI / 2;
-  return mesh;
 }
 
 /**
@@ -405,37 +412,36 @@ function trefoilBracket(mat: Material, screwMat: Material, slotMat: Material, si
   return group;
 }
 
-/** Four sloped faces joining the top rectangle of a window (at the lid top) to its opening (at the lid underside). */
-function windowBevel(cx: number, top: { x: number; from: number; to: number }, mat: Material): Mesh {
-  const topPoints = [[-top.x, top.from], [top.x, top.from], [top.x, top.to], [-top.x, top.to]] as const;
-  const bottom = [[-WINDOW_HALF_WIDTH, WINDOW_Y_FROM], [WINDOW_HALF_WIDTH, WINDOW_Y_FROM], [WINDOW_HALF_WIDTH, WINDOW_Y_TO], [-WINDOW_HALF_WIDTH, WINDOW_Y_TO]] as const;
+/** The wall of a window: the chamfer and straight sides at the top, the sloped front wall, all the way down to the opening at the underside of the lid. */
+function windowWall(cx: number, mat: Material): Mesh {
+  // front: the slope runs on through the chamfer level to the opening; sides and back: chamfer, then straight down
+  const outline = (grow: number, front: number): [number, number][] => [
+    [cx - WINDOW_HALF_WIDTH - grow, WINDOW_Y_FROM - front],
+    [cx + WINDOW_HALF_WIDTH + grow, WINDOW_Y_FROM - front],
+    [cx + WINDOW_HALF_WIDTH + grow, WINDOW_Y_TO + grow],
+    [cx - WINDOW_HALF_WIDTH - grow, WINDOW_Y_TO + grow],
+  ];
+  const levels: [[number, number][], number][] = [
+    [outline(WINDOW_CHAMFER, WINDOW_FRONT_SLOPE), LID_TOP],
+    [outline(0, WINDOW_FRONT_SLOPE * (1 - WINDOW_CHAMFER / LID_THICKNESS)), LID_TOP - WINDOW_CHAMFER],
+    [outline(0, 0), LID_BOTTOM],
+  ];
   const positions: number[] = [];
-  for (const [x, y] of topPoints) positions.push(cx + x, y, LID_TOP);
-  for (const [x, y] of bottom) positions.push(cx + x, y, LID_BOTTOM);
+  for (const [points, z] of levels) for (const [x, y] of points) positions.push(x, y, z);
   const index: number[] = [];
-  for (let k = 0; k < 4; k++) {
-    const k2 = (k + 1) % 4;
-    index.push(k, k2, 4 + k, k2, 4 + k2, 4 + k);
+  for (let row = 0; row < levels.length - 1; row++) {
+    for (let k = 0; k < 4; k++) {
+      const k2 = (k + 1) % 4;
+      const a = row * 4 + k;
+      const b = row * 4 + k2;
+      index.push(a, b, a + 4, b, b + 4, a + 4);
+    }
   }
   const geometry = new BufferGeometry();
   geometry.setAttribute("position", new Float32BufferAttribute(positions, 3));
   geometry.setIndex(index);
   geometry.computeVertexNormals();
   return new Mesh(geometry, mat);
-}
-
-/** One corner hook clip of the lid: a small plate with a slotted screw and a tab that folds down over the wall top. */
-function cornerClip(index: number, x: number, y: number, outwardX: number, outwardY: number): Group {
-  const brass = getMaterial("brass-brushed");
-  const dark = getMaterial("brass-dark");
-  const clip = named(new Group(), `lidClip:${index}`);
-  clip.position.set(x, y, LID_TOP);
-  const plate = at(box(5, 3.2, 0.5, brass), 0, 0, 0.25);
-  clip.add(plate);
-  clip.add(at(slottedScrew(brass, dark, 1.05, 0.5 + index), -outwardX * 0.4, -outwardY * 0.3, 0.5));
-  // the hook: a tab over the edge of the lid, bent down along the wall
-  clip.add(at(box(2.6, 0.5, 5.2, brass), outwardX * 0.2, outwardY * 2.7, -2.1));
-  return clip;
 }
 
 export interface LidParts {
@@ -462,39 +468,20 @@ export function buildLid(levelCount: number, pitch: number): LidParts {
   const lid = named(new Group(), "lid");
   lid.userData.body = "fixed";
   const plate = rectangle(-lidHalf, yFront, lidHalf, yBack);
-  const top = { x: WINDOW_HALF_WIDTH + WINDOW_BEVEL_SIDE, from: WINDOW_Y_FROM - WINDOW_BEVEL_FRONT, to: WINDOW_Y_TO + WINDOW_BEVEL_BACK };
-  for (let i = 0; i < levelCount; i++) plate.holes.push(rectangleHole(levelX(i) - top.x, top.from, levelX(i) + top.x, top.to));
+  for (let i = 0; i < levelCount; i++) plate.holes.push(rectangleHole(levelX(i) - WINDOW_HALF_WIDTH - WINDOW_CHAMFER, WINDOW_Y_FROM - WINDOW_FRONT_SLOPE, levelX(i) + WINDOW_HALF_WIDTH + WINDOW_CHAMFER, WINDOW_Y_TO + WINDOW_CHAMFER));
   // the sliding strip ends bend down into a slot at each end of its row; the slot is as long as the strip's travel (photos)
   const slotX = halfSpan - 1 - 1.8;
   for (const side of [-1, 1]) plate.holes.push(rectangleHole(side * slotX - SLOT_HALF_WIDTH, STRIP_CENTRE_Y - STRIP_LENGTH / 2 - BAR_TRAVEL, side * slotX + SLOT_HALF_WIDTH, STRIP_CENTRE_Y + STRIP_LENGTH / 2 + BAR_TRAVEL));
   lid.add(named(extrude(plate, LID_THICKNESS, LID_BOTTOM, getMaterial("brass-lid")), "lidPlate"));
 
-  // bevel faces of the windows: from the wide top edge down to the opening
+  // walls of the windows: the chamfer and the straight sides
   const bevelMaterial = brass.clone();
   bevelMaterial.side = DoubleSide;
-  for (let i = 0; i < levelCount; i++) lid.add(named(windowBevel(levelX(i), top, bevelMaterial), `windowBevel:${i}`));
+  for (let i = 0; i < levelCount; i++) lid.add(named(windowWall(levelX(i), bevelMaterial), `windowBevel:${i}`));
 
-  // double engraved border line inside the edge (a normal-map engraving in the materials step)
-  const lineWidth = 0.22;
-  for (const inset of [2.0, 2.6]) {
-    const x0 = -lidHalf + inset;
-    const x1 = lidHalf - inset;
-    const y0 = yFront + inset;
-    const y1 = yBack - inset;
-    const line = (cx: number, cy: number, w: number, h: number): Mesh => {
-      const mesh = at(new Mesh(new PlaneGeometry(w, h), dark), cx, cy, LID_TOP + 0.02);
-      mesh.name = `lidBorder:${inset}`;
-      return mesh;
-    };
-    lid.add(line(0, y0, x1 - x0, lineWidth), line(0, y1, x1 - x0, lineWidth), line(x0, (y0 + y1) / 2, lineWidth, y1 - y0), line(x1, (y0 + y1) / 2, lineWidth, y1 - y0));
-  }
+  // the double border line 2.0 and 2.6 mm inside the edge is engraved by the lid material (`lines` in the wear shader), not built
 
-  // four hook clips at the corners, slotted screws at the middle of the front and back edges
-  const cornerX = lidHalf - 3.2;
-  const clipPositions = [[-1, -1], [1, -1], [-1, 1], [1, 1]] as const;
-  clipPositions.forEach(([sx, sy], k) => {
-    lid.add(cornerClip(k, sx * cornerX, sy < 0 ? yFront + 3 : yBack - 3, sx, sy));
-  });
+  // slotted screws at the middle of the front and back edges (the photos show no corner clips)
   for (const [k, y] of [[0, yFront + 3.6], [1, yBack - 3.6]] as const) {
     lid.add(named(at(slottedScrew(brass, dark, 0.8, 0.2 + k), 0, y, LID_TOP), `lidScrew:${k}`));
   }
@@ -571,14 +558,42 @@ export function buildLid(levelCount: number, pitch: number): LidParts {
   const length = levelCount * pitch - 6;
   const yc = (LABEL_Y_FROM + LABEL_Y_TO) / 2;
   const half = length / 2;
+  // each end is a spade-shaped point (IMG_6514, traced at 4x): a short notch, then a rounded lobe that sweeps up to the tip. Profiles run from the tip (u = 0) outwards, v is the offset from the middle line.
+  const hh = (LABEL_Y_TO - LABEL_Y_FROM) / 2;
+  type Node = { u: number; v: number; control?: [number, number] }; // the control belongs to the segment that ENDS at this node
+  const lower: Node[] = [
+    { u: 0, v: 0 },
+    { u: 3.0, v: -hh + 2.9, control: [2.0, -1.4] },
+    { u: 7.4, v: -hh + 0.85, control: [3.9, -hh + 1.0] },
+    { u: 9.9, v: -hh + 1.75, control: [9.0, -hh + 0.75] },
+    { u: 10.4, v: -hh, control: [10.0, -hh + 0.6] },
+    { u: 11, v: -hh },
+  ];
+  // the end is symmetric about the middle line (user): the upper side mirrors the lower
+  const upper: Node[] = lower.map((n) => ({ u: n.u, v: -n.v, control: n.control && [n.control[0], -n.control[1]] }));
   const strip = new Shape();
-  strip.moveTo(-half, yc);
-  strip.quadraticCurveTo(-half + 1.2, LABEL_Y_TO - 1.4, -half + 6, LABEL_Y_TO);
-  strip.lineTo(half - 6, LABEL_Y_TO);
-  strip.quadraticCurveTo(half - 1.2, LABEL_Y_TO - 1.4, half, yc);
-  strip.quadraticCurveTo(half - 1.2, LABEL_Y_FROM + 1.4, half - 6, LABEL_Y_FROM);
-  strip.lineTo(-half + 6, LABEL_Y_FROM);
-  strip.quadraticCurveTo(-half + 1.2, LABEL_Y_FROM + 1.4, -half, yc);
+  const walk = (profile: Node[], tipX: number, dir: number, forward: boolean): void => {
+    const point = (n: Node): [number, number] => [tipX + dir * n.u, yc + n.v];
+    const draw = (to: Node, owner: Node): void => {
+      const [x, y] = point(to);
+      if (owner.control) strip.quadraticCurveTo(tipX + dir * owner.control[0], yc + owner.control[1], x, y);
+      else strip.lineTo(x, y);
+    };
+    if (forward) {
+      for (let k = 1; k < profile.length; k++) draw(profile[k]!, profile[k]!);
+    } else {
+      const last = profile.length - 1;
+      draw(profile[last]!, profile[last]!); // along the straight edge to the outer end, then back to the tip
+      for (let k = last - 1; k >= 0; k--) draw(profile[k]!, profile[k + 1]!);
+    }
+  };
+  const [x0, y0] = [-half, yc + upper[0]!.v];
+  strip.moveTo(x0, y0);
+  walk(upper, -half, 1, true);
+  walk(upper, half, -1, false);
+  strip.lineTo(half, yc + lower[0]!.v);
+  walk(lower, half, -1, true);
+  walk(lower, -half, 1, false);
   label.add(extrude(strip, LABEL_THICKNESS, LID_TOP, brass, 12));
   const textWidth = length - 16;
   const textHeight = LABEL_Y_TO - LABEL_Y_FROM - 1;
@@ -588,9 +603,13 @@ export function buildLid(levelCount: number, pitch: number): LidParts {
   );
   label.add(named(at(text, 0, yc, LID_TOP + LABEL_THICKNESS + 0.02), "labelText"));
   // one screw at each tip and one on the line between "mille" and "dizaines de mille" and between "Centaine" and "dizaine"
-  const screws = [-length / 2 + 4, length / 2 - 4];
+  const screws = [-length / 2 + 5.5, length / 2 - 5.5];
   for (const i of [1, 3]) if (i + 1 < levelCount) screws.push((levelX(i) + levelX(i + 1)) / 2);
-  for (const x of screws) label.add(at(bolt(brass, 0.9, 0.5), x, yc, LID_TOP + LABEL_THICKNESS + 0.25));
+  // domed rivet heads with a bright rim (IMG_6513)
+  const rivetGeometry = new SphereGeometry(0.95, 20, 8, 0, Math.PI * 2, 0, Math.PI / 2);
+  rivetGeometry.scale(1, 0.5, 1);
+  rivetGeometry.rotateX(Math.PI / 2); // the dome points along +z
+  for (const x of screws) label.add(at(new Mesh(rivetGeometry, brass), x, yc + 0.5, LID_TOP + LABEL_THICKNESS));
 
   // ---- sliding strip with its two barrels (open end towards the wheels)
   const slider = named(new Group(), "slider");
@@ -599,10 +618,18 @@ export function buildLid(levelCount: number, pitch: number): LidParts {
   const stripWidth = 2 * (halfSpan - 1);
   const stripTop = LID_TOP + STRIP_THICKNESS;
   slider.add(named(at(forgedBox(stripWidth, STRIP_LENGTH, STRIP_THICKNESS, stripBrass, 0.18), 0, STRIP_CENTRE_Y, LID_TOP + STRIP_THICKNESS / 2), "bar"));
+  // the user-side edge is bent over: a bright rounded bead along it (strip-barrels-crop.png)
+  const lipRadius = 0.28;
+  const lipGeometry = new CylinderGeometry(lipRadius, lipRadius, stripWidth - 0.4, 16);
+  lipGeometry.rotateZ(Math.PI / 2);
+  slider.add(named(at(new Mesh(lipGeometry, stripBrass), 0, STRIP_CENTRE_Y + STRIP_LENGTH / 2 - 0.1, stripTop - 0.1), "stripLip"));
   // a leg bends down from each end of the strip into its slot
-  // two slotted screws hold the strip, one just inside each barrel (strip-barrels-crop.png)
+  // one domed rivet holds the strip beside each barrel, on the strip's middle line (IMG_6514)
+  const stripRivet = new SphereGeometry(0.85, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2);
+  stripRivet.scale(1, 0.55, 1);
+  stripRivet.rotateX(Math.PI / 2);
   for (const side of [-1, 1]) {
-    slider.add(named(at(slottedScrew(stripBrass, dark, 0.95, 0.3 + side), side * (stripWidth / 2 - 2 * BARREL_OUTER - 2.6), STRIP_CENTRE_Y + STRIP_LENGTH / 2 - 2.4, stripTop), `stripScrew:${side < 0 ? "left" : "right"}`));
+    slider.add(named(at(new Mesh(stripRivet, stripBrass), side * (stripWidth / 2 - 2 * BARREL_OUTER - 1.6), STRIP_CENTRE_Y + STRIP_LENGTH / 2 - 2.6, stripTop), `stripScrew:${side < 0 ? "left" : "right"}`));
   }
   for (const side of [-1, 1]) {
     slider.add(named(at(forgedBox(2 * SLOT_HALF_WIDTH - 0.5, STRIP_LENGTH - 1, STRIP_LEG_LENGTH, stripBrass, 0.2), side * (stripWidth / 2 - 1.8), STRIP_CENTRE_Y, LID_TOP - STRIP_LEG_LENGTH / 2 + STRIP_THICKNESS), `stripLeg:${side < 0 ? "left" : "right"}`));

@@ -61,14 +61,19 @@ export function bakeLidFootprint(renderer: WebGLRenderer, scene: Object3D, sigma
   const shapes = new Scene();
   lid.updateWorldMatrix(true, true);
   const inverse = new Matrix4().copy(lid.matrixWorld).invert();
-  lid.traverse((o) => {
-    if (!(o instanceof Mesh) || o === plate || o.userData.hit !== undefined || o.userData.proxy === true || !o.visible) return;
-    if (!Array.isArray(o.material) && o.material.name === "brass-lid") return;
-    const shape = new Mesh(o.geometry, white);
-    shape.matrixAutoUpdate = false;
-    shape.matrix.multiplyMatrices(inverse, o.matrixWorld);
-    shapes.add(shape);
-  });
+  // the label strip and the sliding strip are siblings of the lid: their grime follows their outline too (the strip is baked at rest)
+  const roots = [lid, lid.parent?.getObjectByName("label"), lid.parent?.getObjectByName("slider")].filter((r): r is Object3D => !!r);
+  for (const root of roots) {
+    root.updateWorldMatrix(true, true);
+    root.traverse((o) => {
+      if (!(o instanceof Mesh) || o === plate || o.userData.hit !== undefined || o.userData.proxy === true || !o.visible) return;
+      if (!Array.isArray(o.material) && (o.material.name === "brass-lid" || o.name === "labelText")) return;
+      const shape = new Mesh(o.geometry, white);
+      shape.matrixAutoUpdate = false;
+      shape.matrix.multiplyMatrices(inverse, o.matrixWorld);
+      shapes.add(shape);
+    });
+  }
 
   const width = Math.ceil(size.x * PX_PER_MM);
   const height = Math.ceil(size.y * PX_PER_MM);

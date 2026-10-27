@@ -39,8 +39,8 @@ export const WINDOW_Y_TO = 44.7;
 export const WINDOW_HALF_WIDTH = 5.6;
 
 /** Label strip between the wheels and the windows. */
-export const LABEL_Y_FROM = 15.5;
-export const LABEL_Y_TO = 28;
+export const LABEL_Y_FROM = 17.5;
+export const LABEL_Y_TO = 26;
 export const LABEL_THICKNESS = 0.8;
 export const LABELS = ["Nombre\nsimple", "dizaine", "Centaine", "mille", "dizaines\nde mille", "Centaine\nde mille"];
 

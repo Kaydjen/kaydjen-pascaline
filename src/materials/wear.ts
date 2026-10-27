@@ -76,11 +76,12 @@ export interface ScanSettings {
   offY: number;
   /** Contact dirt around the bases of the parts that stand on a plate (the lid): strength and width in mm. */
   halo: number;
-  haloW: number;
   /** Polished zones where use rubs the dirt away (hands at the front edge, the stylus at the rings, the strip track): 0 = off. */
   zones: number;
   /** Lighter, rubbed rim along the border of the lid plate. */
   rim: number;
+  /** Two fine engraved border lines parallel to the lid edge (a groove in the height and a dark film in it): 0 = off. */
+  lines: number;
   /** Rubbed bright edges where the surface curves sharply (bevels, rims, dome edges); measured from the normals, no UVs needed. */
   curv: number;
 }
@@ -103,7 +104,7 @@ export const CLEAN: WearSettings = {
   patinaColor: "#4b5a3a",
 };
 
-export const NO_SCAN: ScanSettings = { scan: "", stain: 1, tile: 60, tint: "#ffffff", normal: 1, roughMul: 1, roughAdd: 0, wood: false, edge: 0, edgeWidth: 1.2, edgeColor: "#c9a95a", wave: 0, waveSize: 60, low: 0, lowZ: -35.9, lowH: 20, corner: 0, cornerWidth: 8, scan2: "", tile2: 50, tint2: "#ffffff", amount2: 0, bottom2: 0.7, streak2: 0.7, streakLen2: 30, spots2: 0.3, vig: 0, vigX: 0, vigY: 7, vigHX: 126, vigHY: 50.5, offX: 0, offY: 0, halo: 0, haloW: 3.5, zones: 0, rim: 0, curv: 0 };
+export const NO_SCAN: ScanSettings = { scan: "", stain: 1, tile: 60, tint: "#ffffff", normal: 1, roughMul: 1, roughAdd: 0, wood: false, edge: 0, edgeWidth: 1.2, edgeColor: "#c9a95a", wave: 0, waveSize: 60, low: 0, lowZ: -35.9, lowH: 20, corner: 0, cornerWidth: 8, scan2: "", tile2: 50, tint2: "#ffffff", amount2: 0, bottom2: 0.7, streak2: 0.7, streakLen2: 30, spots2: 0.3, vig: 0, vigX: 0, vigY: 7, vigHX: 126, vigHY: 50.5, offX: 0, offY: 0, halo: 0, zones: 0, rim: 0, lines: 0, curv: 0 };
 
 export type WearLevel = "none" | "light" | "medium" | "heavy";
 
@@ -161,7 +162,6 @@ const ZONES: [number, number, number, number, number][] = [
 ];
 const ZONE_A = ZONES.map((z) => new Vector4(z[0], z[1], z[2], z[3]));
 const ZONE_S = ZONES.map((z) => z[4]);
-const HALO_RECTS = [new Vector4(0, 21.75, 114, 6.25), new Vector4(0, 37.5, 119, 4.5)];
 
 const blank = new DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1, RGBAFormat, UnsignedByteType);
 blank.needsUpdate = true;
@@ -245,9 +245,9 @@ function uniformsFor(s: WearSettings): WearUniforms {
     uVigH: { value: new Vector2(126, 50.5) },
     uScanOff: { value: new Vector2(0, 0) },
     uHalo: { value: 0 },
-    uHaloW: { value: 3.5 },
     uZones: { value: 0 },
     uRim: { value: 0 },
+    uLines: { value: 0 },
     uCurv: { value: 0 },
     uZoneA: { value: ZONE_A },
     uZoneS: { value: ZONE_S },
@@ -258,7 +258,6 @@ function uniformsFor(s: WearSettings): WearUniforms {
     uFootSkirt: lidFootprint.skirt,
     uFootSkirtW: lidFootprint.skirtWeight,
     uFootNoise: lidFootprint.noise,
-    uHaloRects: { value: HALO_RECTS },
     uWearNoise: { value: noiseTexture },
   };
 }
@@ -292,13 +291,12 @@ uniform vec2 uFaceSize;
 uniform float uWave, uWaveScale, uLow, uLowZ, uLowH, uCorner, uCornerW;
 uniform float uScan2On, uScan2Tile, uScan2Amount, uScan2Bottom, uScan2Streak, uScan2StreakLen, uScan2Spots;
 uniform vec3 uScan2Tint;
-uniform float uVig, uHalo, uHaloW;
+uniform float uVig, uHalo;
 uniform vec2 uVigC, uVigH, uScanOff;
 uniform sampler2D uFoot;
 uniform vec2 uFootMin, uFootSize, uFootCore, uFootSkirt;
 uniform float uFootSkirtW, uFootNoise;
-uniform float uRim, uCurv;
-uniform vec4 uHaloRects[2];
+uniform float uRim, uCurv, uLines;
 uniform float uZones;
 uniform vec4 uZoneA[5];
 uniform float uZoneS[5];
@@ -508,15 +506,10 @@ if (uVig > 0.0) {
 float wearHalo = 0.0;
 #ifdef W_HALO
 if (uHalo > 0.0) {
-  float dmin = 1e3;
-  for (int j = 0; j < 2; j++) {
-    vec2 q = abs(vWearPos.xy - uHaloRects[j].xy) - uHaloRects[j].zw;
-    dmin = min(dmin, length(max(q, 0.0)) + min(max(q.x, q.y), 0.0));
-  }
   // the footprint is the blurred top view of the parts: about 0.5 at their outline, falling off outside
   float foot = texture2D(uFoot, (vWearPos.xy - uFootMin) / uFootSize).r;
-  float core = max(1.0 - smoothstep(0.0, uHaloW, dmin), smoothstep(uFootCore.x, uFootCore.y, foot));
-  float skirt = max(1.0 - smoothstep(0.0, uHaloW * 3.2, dmin), smoothstep(uFootSkirt.x, uFootSkirt.y, foot));
+  float core = smoothstep(uFootCore.x, uFootCore.y, foot);
+  float skirt = smoothstep(uFootSkirt.x, uFootSkirt.y, foot);
   float patchy = 1.0 + uFootNoise * (wFbm(vWearPos * 0.5 + 5.0) - 0.5);
   wearHalo = clamp((core * 1.0 + skirt * uFootSkirtW) * uHalo * patchy, 0.0, 1.0);
   diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.36, 0.31, 0.25), wearHalo);
@@ -541,6 +534,19 @@ if (uRim > 0.0) {
   diffuseColor.rgb = mix(diffuseColor.rgb, clamp(diffuseColor.rgb * 1.3, 0.0, 1.0) * vec3(1.0, 0.94, 0.8), clamp(rim, 0.0, 1.0));
 }
 #endif
+float wearLine = 0.0;
+#ifdef W_LINES
+if (uLines > 0.0) {
+  // two grooves 2.0 and 2.6 mm inside the border of the plate (the same centre and half size as the rim)
+  vec2 lq = uVigH - abs(vWearPos.xy - uVigC);
+  float edgeDist = min(lq.x, lq.y);
+  float lineHalf = max(0.1, wearPx * 0.9);
+  float tent = max(max(1.0 - abs(edgeDist - 2.0) / lineHalf, 0.0), max(1.0 - abs(edgeDist - 2.6) / lineHalf, 0.0));
+  float lineFade = 0.1 / lineHalf; // a hairline wider than a pixel at a distance would turn into a smear: its strength falls with the pixel size
+  wearLine = tent * clamp(lineFade, 0.0, 1.0) * (0.75 + 0.5 * wNoise(vWearPos * 1.3)) * uLines;
+  diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.16, 0.13, 0.1), clamp(smoothstep(0.0, 0.7, tent) * clamp(lineFade, 0.0, 1.0) * uLines, 0.0, 0.9));
+}
+#endif
 #ifdef W_CURV
 if (uCurv > 0.0) {
   float curvature = length(fwidth(wScanN)) / max(wearPx, 1e-4);
@@ -553,7 +559,7 @@ float wearGrain = 0.0;
 float wearGrainFade = 1.0 - smoothstep(0.08, 0.45, wearPx * 38.0);
 wearGrain = (wNoise(vWearPos * 38.0) - 0.5) * uGrain * wearGrainFade;
 #endif
-float wearHeight = (wearBrush - 0.5) * uBrushBump * wearBrushFade + wearScratch * -uScratchBump * 0.6 + wearGrain * 0.35;
+float wearHeight = (wearBrush - 0.5) * uBrushBump * wearBrushFade + wearScratch * -uScratchBump * 0.6 + wearGrain * 0.35 - wearLine * 1.2;
 `;
 
 const ROUGHNESS_INJECTION = /* glsl */ `
@@ -601,6 +607,7 @@ export function wearFeatures(scan: ScanSettings, wear: WearSettings): Set<string
     ["HALO", scan.halo > 0],
     ["ZONES", scan.zones > 0],
     ["RIM", scan.rim > 0],
+    ["LINES", scan.lines > 0],
     ["CURV", scan.curv > 0],
     ["WAVE", scan.wave > 0],
     ["BRUSH", wear.brushAmount > 0 || wear.brushBump > 0],
@@ -612,7 +619,7 @@ export function wearFeatures(scan: ScanSettings, wear: WearSettings): Set<string
   ];
   return new Set(on.filter(([, enabled]) => enabled).map(([name]) => name));
 }
-const ALL_FEATURES = ["SCAN", "STAIN", "SCAN2", "CORNER", "EDGE", "LOW", "VIG", "HALO", "ZONES", "RIM", "CURV", "WAVE", "BRUSH", "SCRATCH", "GRIME", "PATINA", "TINT", "GRAIN"];
+const ALL_FEATURES = ["SCAN", "STAIN", "SCAN2", "CORNER", "EDGE", "LOW", "VIG", "HALO", "ZONES", "RIM", "LINES", "CURV", "WAVE", "BRUSH", "SCRATCH", "GRIME", "PATINA", "TINT", "GRAIN"];
 
 /**
  * Adds the shader to a material (once); later changes go through `updateWear` and `updateScan`. `faceSize` is the box face size in mm for the edge wear.
@@ -625,7 +632,7 @@ export function installWear(material: MeshStandardMaterial, settings: WearSettin
   const uniforms = uniformsFor(settings);
   if (faceSize) (uniforms.uFaceSize!.value as Vector2).set(faceSize[0], faceSize[1]);
   material.userData.wear = uniforms;
-  material.customProgramCacheKey = () => `wear-21:${list.join(",")}`;
+  material.customProgramCacheKey = () => `wear-23:${list.join(",")}`;
   material.onBeforeCompile = (shader: WebGLProgramParametersWithUniforms) => {
     Object.assign(shader.uniforms, uniforms);
     shader.vertexShader = shader.vertexShader.replace("#include <common>", VERTEX_DECLARATIONS).replace("#include <begin_vertex>", "#include <begin_vertex>\nvWearPos = transformed;\nvWearN = objectNormal;\nvWearUv = uv;");
@@ -697,9 +704,9 @@ export function updateScan(material: MeshStandardMaterial, s: ScanSettings, text
   (u.uScanOff!.value as Vector2).set(s.offX, s.offY);
   u.uZones!.value = s.zones;
   u.uRim!.value = s.rim;
+  u.uLines!.value = s.lines;
   u.uCurv!.value = s.curv;
   u.uHalo!.value = s.halo;
-  u.uHaloW!.value = s.haloW;
   (u.uVigC!.value as Vector2).set(s.vigX, s.vigY);
   (u.uVigH!.value as Vector2).set(s.vigHX, s.vigHY);
   u.uCorner!.value = s.corner;

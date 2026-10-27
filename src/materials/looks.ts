@@ -113,10 +113,10 @@ function lid(offX: number, offY: number, extra: Partial<ScanSettings> = {}, leve
 const LID_GEOMETRY = { uneven: 0.7, dents: 3, seed: 7 } as const;
 /** Occlusion belongs to the ambient light: on bright, directly lit metal it is faded to a quarter (choice E). */
 const AO = { on: true, radius: 2.5, intensity: 1.9, distanceExponent: 2, thickness: 3, directStrength: 0.25, fadeFrom: 0.15, fadeTo: 0.8 } as const;
-const LID_USE = { halo: 1.2, haloW: 2.2, vig: 0.4, zones: 1.0, rim: 0.3 } as const;
+const LID_USE = { halo: 1.2, vig: 0.4, zones: 1.0, rim: 0.3, lines: 1.0 } as const;
 
 /** FINAL lid: 30 % of the scan blotches, more dirt in the crevices, polished zones at the front edge and the barrel mouths. */
-const FINAL_LID = { ...LID_USE, stain: 0.3, halo: 1.6, haloW: 2.2 } as const;
+const FINAL_LID = { ...LID_USE, stain: 0.3, halo: 1.6 } as const;
 /** The plank: pale aged oak (your base 4), darker, more worn, uneven. */
 function plank(tint: string, extra: Partial<ScanSettings> = {}, wear: WearLevel = "medium", scan = "Wood060"): Look["materials"] {
   // the dirt along the bottom is brown, never green: the green-blue patina colour made the plank glow

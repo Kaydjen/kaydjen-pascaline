@@ -1,7 +1,7 @@
 import { BufferGeometry, CanvasTexture, CylinderGeometry, Float32BufferAttribute, Group, LatheGeometry, Mesh, MeshStandardMaterial, RingGeometry, SRGBColorSpace, Vector2 } from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { getMaterial } from "../materials/factory";
-import { FONT_NUMERAL } from "../materials/fonts";
+import { FONT_LABEL } from "../materials/fonts";
 import { STEP_DEG } from "../sim/params";
 import { at, cylinder, named, R, RAD, shaft, tag } from "./common";
 import { crownAngleDeg, LID_BOTTOM, LID_TOP, numeralRotation, seededRandom } from "./case";
@@ -61,7 +61,7 @@ function hubTexture(bump: boolean): CanvasTexture | null {
   const radius = 5.95 * scale;
   const random = seededRandom(1642);
   const jitter = (amount: number): number => (random() * 2 - 1) * amount;
-  ctx.font = `92px ${FONT_NUMERAL}`;
+  ctx.font = `92px ${FONT_LABEL}`;
   for (let d = 0; d < 10; d++) {
     const a = crownAngleDeg(d) * RAD;
     ctx.save();
@@ -80,7 +80,7 @@ function hubTexture(bump: boolean): CanvasTexture | null {
       });
     } else {
       ctx.filter = "blur(0.5px)";
-      ctx.fillStyle = `rgba(28,22,16,${(0.22 + 0.3 * depth).toFixed(2)})`;
+      ctx.fillStyle = `rgba(8,5,3,${Math.min(0.95, 0.55 + 0.25 * depth).toFixed(2)})`;
       ctx.fillText(String(d), dx, 3);
     }
     ctx.restore();

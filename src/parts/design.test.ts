@@ -5,6 +5,8 @@ import { crownAngleDeg, DIGIT_HEIGHT, DRUM_ROW_Y, numeralRotation, STRIP_CENTRE_
 import { Assembly } from "../scene/assembly";
 import { STEP_DEG } from "../sim/params";
 import { DOTTED_SPOKES } from "./wheelGroup";
+import { FINAL_LOOK } from "../materials/looks";
+import { NO_SCAN } from "../materials/wear";
 
 /**
  * Design rules read from the reference photos (docs/reference/photos). They catch shape mistakes that the physics tests
@@ -98,22 +100,20 @@ describe("design rules from the photos", () => {
     expect(topNear - topFar).toBeGreaterThan(0.25); // the tip sits lower than the hub end
   });
 
-  it("lid (bw-front-view.png, strip-barrels-crop.png): four corner hook clips, screws at the edge middles, border line 2-3 mm inside the edge", () => {
+  it("lid (bw-front-view.png, strip-barrels-crop.png): no corner clips, screws at the edge middles, border line 2-3 mm inside the edge", () => {
     const clips: string[] = [];
     view.root.traverse((o) => /^lidClip:\d$/.test(o.name) && clips.push(o.name));
-    expect(clips).toHaveLength(4);
+    expect(clips).toHaveLength(0);
     expect(findObject("lidScrew:0")).toBeDefined();
-    const plate = find("lidPlate");
+    // the border lines are engraved by the lid material measured from the plate outline the shader is told about (`vigX/vigY/vigHX/vigHY`)
+    const plate = new Assembly(new Mechanism({ levelCount: 6 })).root.getObjectByName("lidPlate") as Mesh; // the shader defaults describe the 6-wheel lid
     plate.geometry.computeBoundingBox();
-    const edge = plate.geometry.boundingBox!.max.x;
-    const lines: number[] = [];
-    findObject("lid").traverse((o) => {
-      // the vertical border lines stand at x = +-(edge - inset)
-      if (o.name.startsWith("lidBorder:") && Math.abs(o.position.x) > 1) lines.push(edge - Math.abs(o.position.x));
-    });
-    expect(lines.length).toBeGreaterThanOrEqual(2);
-    for (const inset of lines) expect(inset).toBeGreaterThanOrEqual(2);
-    for (const inset of lines) expect(inset).toBeLessThanOrEqual(3);
+    const box = plate.geometry.boundingBox!;
+    const scan = NO_SCAN;
+    expect((FINAL_LOOK.materials["brass-lid"]!.scan as { lines: number }).lines).toBeGreaterThan(0);
+    expect(box.max.x).toBeCloseTo(scan.vigX + scan.vigHX, 0);
+    expect(box.max.y).toBeCloseTo(scan.vigY + scan.vigHY, 0);
+    expect(box.min.y).toBeCloseTo(scan.vigY - scan.vigHY, 0);
   });
 
   it("box: patinated sheet walls on a lighter plinth, raw wood inside, ledge under the lid", () => {
