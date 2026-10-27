@@ -25,14 +25,20 @@ export interface GhostHost {
   teardown(): number;
   /** Closes the machine (the stylus only works while the lid is on). */
   close(): void;
+  /** Slow motion on or off (the carry of the demo runs slowly). */
+  slow(on: boolean): void;
 }
 
 /** Something the script waits for: a number of seconds, or a condition that must become true. */
 type Wait = number | (() => boolean);
 
 /** How fast the ghost drags a wheel, degrees per second (the driver limit is 432: 12 steps/s). */
-const SWEEP_DEG_PER_SEC = 280;
-const MOVE_SECONDS = 0.9;
+const SWEEP_DEG_PER_SEC = 390;
+const MOVE_SECONDS = 0.45;
+/** How long the carry of the demo runs in slow motion (real seconds), then the clock returns to normal. */
+const CARRY_SLOW_SECONDS = 2;
+/** The demo works on this many wheels, from the units up: 999 + 1 carries through all three. */
+const DEMO_WHEELS = 3;
 
 const smooth = (t: number): number => t * t * (3 - 2 * t);
 
@@ -47,6 +53,14 @@ export class Ghost {
   private waiting: Wait = 0;
   private waited = 0;
   private readonly pointer = new Vector2();
+  /** The demo has put the clock in slow motion (it gives it back, and only then). */
+  private slowed = false;
+
+  private unslow(): void {
+    if (!this.slowed) return;
+    this.slowed = false;
+    this.host.slow(false);
+  }
 
   constructor(
     private readonly host: GhostHost,
@@ -72,6 +86,7 @@ export class Ghost {
     if (!this.running) return;
     this.running = null;
     this.script = null;
+    this.unslow();
     this.stylus.release();
   }
 
@@ -85,6 +100,7 @@ export class Ghost {
     if (next.done) {
       this.running = null;
       this.script = null;
+      this.unslow();
       return;
     }
     this.waiting = next.value;
@@ -101,9 +117,13 @@ export class Ghost {
     const mech = (): Mechanism => this.host.mechanism();
     const n = mech().levels.length;
     if (task === "demo") {
-      // dial nine on every wheel (what is missing to 9), lowest first, then add one: the cascade runs through all levels
-      for (let level = 0; level < n; level++) yield* this.dial(level, 9 - mech().digit(level));
-      yield* this.dial(0, 1);
+      // dial nine on the three right wheels (what is missing to 9), lowest first, then add one in slow motion: the carry runs through all three
+      for (let level = 0; level < Math.min(DEMO_WHEELS, n); level++) yield* this.dial(level, 9 - mech().digit(level));
+      this.slowed = true;
+      this.host.slow(true);
+      yield* this.dial(0, 1, false);
+      yield CARRY_SLOW_SECONDS; // the carry runs slowly for a moment, then at its own pace
+      this.unslow();
       yield* this.settle();
     } else {
       // reset: the complement per wheel, lowest first (the carries add one to the next wheel on their own)
@@ -147,7 +167,7 @@ export class Ghost {
   }
 
   /** Turns `steps` (0..9) on one level: gets the stylus, hovers over a gap, inserts and drags to the stop or by that many steps. */
-  private *dial(level: number, steps: number): Generator<Wait, void, void> {
+  private *dial(level: number, steps: number, settleAfter = true): Generator<Wait, void, void> {
     if (steps <= 0) return;
     const assembly = this.host.assembly();
     const mech = this.host.mechanism();
@@ -188,8 +208,8 @@ export class Ghost {
     }
     const target = u + steps;
     yield () => mech.levels[level]!.u >= target - 0.02 && this.stylus.dragging;
-    yield 0.15;
+    yield 0.1;
     this.stylus.release();
-    yield* this.settle();
+    if (settleAfter) yield* this.settle();
   }
 }

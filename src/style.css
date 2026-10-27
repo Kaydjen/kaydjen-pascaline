@@ -205,6 +205,57 @@ body {
   transition-duration: 160ms;
 }
 
+/* credits: one small dim word, and a plate that opens above it */
+.dock button.credits-button {
+  font-size: 11px;
+  padding: 6px 2px;
+  opacity: 0.55;
+}
+
+.dock button.credits-button:hover,
+.dock button.credits-button.on {
+  opacity: 1;
+}
+
+.credits {
+  position: fixed;
+  right: 22px;
+  bottom: 62px;
+  width: 340px;
+  padding: 12px 16px 10px;
+  background: rgba(30, 25, 19, 0.95);
+  border: 1px solid rgba(184, 146, 74, 0.4);
+  border-radius: 4px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55);
+  color: #cdbfa6;
+  font: 14px/1.45 "EB Garamond", Georgia, serif;
+}
+
+.credits[hidden] {
+  display: none;
+}
+
+.credits p {
+  margin: 0 0 8px;
+}
+
+.credits a {
+  color: var(--brass);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(184, 146, 74, 0.35);
+}
+
+.credits a:hover {
+  color: var(--text);
+}
+
+.credits .by {
+  margin: 0;
+  color: var(--dim);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+}
+
 .dock .time {
   display: none;
   align-items: center;

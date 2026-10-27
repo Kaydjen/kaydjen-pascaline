@@ -260,6 +260,12 @@ await page.mouse.dblclick(60, 120);
 await page.waitForTimeout(1500);
 check("a double click on the background keeps the camera working", await page.evaluate(() => !window.__stage.controls.object.position.toArray().some(Number.isNaN)));
 
+// 7c. credits: one small word opens a plate, Escape closes it
+await page.click(".credits-button");
+check("Credits opens a plate with the paper and a licence link", await page.evaluate(() => { const p = document.getElementById("credits"); return !p.hasAttribute("hidden") && p.textContent.includes("Rojas-Sola") && p.querySelector('a[href="/licenses.txt"]') !== null; }));
+await page.keyboard.press("Escape");
+check("Escape closes the credits", await page.evaluate(() => document.getElementById("credits").hasAttribute("hidden")));
+
 // 8. demo and zero, assembled and apart, and cancelling
 const waitIdle = (ms = 90000) => page.waitForFunction(() => window.__app.ghost.running === null, null, { timeout: ms });
 await page.evaluate(() => window.__proto.reset([3, 7, 2, 9, 0, 5]));
@@ -268,7 +274,8 @@ await page.click("text=Demo");
 await waitIdle();
 await page.waitForTimeout(1500);
 d = await digits();
-check("demo (assembled) ends at 000000", d.every((x) => x === 0), JSON.stringify(d));
+check("demo: 999 + 1 on the three right wheels carries into the fourth (units first: 0 0 0 0 1 5)", JSON.stringify(d) === "[0,0,0,0,1,5]", JSON.stringify(d));
+check("the demo gives the clock back at full speed", await page.evaluate(() => window.__app.time.speed === 1));
 await page.evaluate(() => window.__proto.reset([3, 7, 2, 9, 0, 5]));
 await page.click("text=Reset");
 await waitIdle();

@@ -220,6 +220,33 @@ function labelTexture(width: number, height: number, levelCount: number, levelX:
   });
 }
 
+/** The engraved signs on the sliding strip: "+" on its user-side half, "-" on the far half (a cut groove with a faint bright burr). `width` x `height` mm. */
+function signTexture(width: number, height: number): CanvasTexture | null {
+  const pxPerMm = 40;
+  return canvasTexture(Math.round(width * pxPerMm), Math.round(height * pxPerMm), (ctx) => {
+    ctx.lineCap = "round";
+    const arm = 1.05 * pxPerMm;
+    const centreX = (width / 2) * pxPerMm;
+    const paint = (dy: number, colour: string, line: number): void => {
+      ctx.strokeStyle = colour;
+      ctx.lineWidth = line * pxPerMm;
+      ctx.beginPath();
+      // "+" lies on the half towards the user (texture y runs down: the user side is the bottom of the plane), "-" on the far half
+      const plusY = (height * 0.72) * pxPerMm + dy;
+      const minusY = (height * 0.28) * pxPerMm + dy;
+      ctx.moveTo(centreX - arm, plusY);
+      ctx.lineTo(centreX + arm, plusY);
+      ctx.moveTo(centreX, plusY - arm);
+      ctx.lineTo(centreX, plusY + arm);
+      ctx.moveTo(centreX - arm, minusY);
+      ctx.lineTo(centreX + arm, minusY);
+      ctx.stroke();
+    };
+    paint(0.06 * pxPerMm, "rgba(236, 206, 128, 0.3)", 0.26);
+    paint(0, "rgba(8, 5, 3, 0.9)", 0.22);
+  });
+}
+
 function extrude(shape: Shape, depth: number, z: number, mat: Material, curveSegments = 40): Mesh {
   const mesh = new Mesh(new ExtrudeGeometry(shape, { depth, bevelEnabled: false, curveSegments }), mat);
   mesh.position.z = z;
@@ -731,6 +758,15 @@ export function buildLid(levelCount: number, pitch: number): LidParts {
     placed.rotateX(Math.PI / 2); // shape y becomes z, the extrusion runs along -y
     placed.translate(side * scrollX, STRIP_CENTRE_Y + BARREL_LENGTH / 2, LID_TOP + BARREL_OUTER);
     slider.add(named(new Mesh(placed, stripBrass), name));
+  }
+
+  // engraved "+" and "-" near each end of the strip: they slide with it, so the sign on the visible half tells the row
+  for (const side of [-1, 1]) {
+    const signs = new Mesh(
+      new PlaneGeometry(5, STRIP_LENGTH - 1),
+      new MeshStandardMaterial({ map: signTexture(5, STRIP_LENGTH - 1), transparent: true, metalness: 0, roughness: 0.7, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }),
+    );
+    slider.add(named(at(signs, side * (scrollX - 10), STRIP_CENTRE_Y, stripTop + 0.02), `stripSigns:${side < 0 ? "left" : "right"}`));
   }
 
   return { lid, label, slider };

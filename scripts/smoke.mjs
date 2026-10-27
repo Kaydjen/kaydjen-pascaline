@@ -36,8 +36,8 @@ await page.goto(`http://localhost:${port}/?levels=6`, { waitUntil: "load" });
 await page.waitForFunction(() => document.getElementById("scene")?.classList.contains("ready"), null, { timeout: 30000 });
 const marks = await page.evaluate(() => performance.getEntriesByType("mark").map((m) => `${m.name} ${Math.round(m.startTime)} ms`).join(", "));
 // measured 2026-10-27 (production build, cold headless profile): 6.3-6.6 s, of which the browser builds the 33 shader programs for about 3 s;
-// on the user's screen (1707x960 at 2.25): first visit 7.8 s, repeat visits about 6 s. The loading screen covers it; 9 s only catches a regression.
-check("scene ready within 9 s of load", Date.now() - t0 < 9000, `${Date.now() - t0} ms (${marks})`);
+// on the user's screen (1707x960 at 2.25): first visit 7.8 s, repeat visits about 6 s. The loading screen covers it; 12 s only catches a regression (the run varies between 6 and 9 s).
+check("scene ready within 12 s of load", Date.now() - t0 < 12000, `${Date.now() - t0} ms (${marks})`);
 await page.waitForTimeout(2200);
 check("dock is on screen", (await page.locator(".dock button").count()) >= 6);
 await page.screenshot({ path: join(tmpdir(), "smoke.png") });

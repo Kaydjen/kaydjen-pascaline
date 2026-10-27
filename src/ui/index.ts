@@ -5,6 +5,7 @@ import type { StylusController } from "../input/stylusController";
 import type { PrototypeSession } from "../scene/prototype";
 import type { TeardownPlayer } from "../scene/teardownPlayer";
 import { mountChip, NamesSwitch } from "./chip";
+import { mountCredits } from "./credits";
 import { mountDock } from "./dock";
 import { mountLive } from "./live";
 
@@ -34,6 +35,7 @@ export function mountUi(ctx: UiContext): Ui {
     names: { get: () => names.on, set: (on) => (names.on = on) },
     busy: () => ctx.ghost.running !== null || !ctx.session.mechanism.settled(),
   });
+  mountCredits();
   const chip = mountChip(ctx.session, ctx.stylus, names);
   const live = mountLive(ctx.session);
   return {
