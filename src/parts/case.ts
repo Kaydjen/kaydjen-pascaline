@@ -23,6 +23,8 @@ export const WALL = 3;
 export const FLOOR_TOP = -22;
 export const PLINTH_HEIGHT = 8;
 export const PLINTH_OVERHANG = 2.5;
+/** The four turned wooden feet under the plinth (paper part 20: flattened bulbs), mm. */
+export const FOOT_HEIGHT = 6;
 
 /** Inner radius of the crown ring around an input wheel (the wheel itself is 16); the lid is closed under it. */
 export const CROWN_HOLE_RADIUS = 16.4;

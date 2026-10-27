@@ -1,6 +1,6 @@
 import { ExtrudeGeometry, Group, Mesh, Shape } from "three";
 import { getMaterial, getWoodMaterial } from "../materials/factory";
-import { CASE_Y_FRONT, CASE_Z_BOTTOM, PLINTH_HEIGHT, PLINTH_OVERHANG, WALL } from "./case";
+import { CASE_Y_FRONT, CASE_Z_BOTTOM, FOOT_HEIGHT, PLINTH_HEIGHT, PLINTH_OVERHANG, WALL } from "./case";
 import { at, box, cylinder, named, tag } from "./common";
 import { hitBox } from "./proxies";
 
@@ -21,7 +21,7 @@ const SIDE_GAP = 20;
 /** Plan position of the stand (middle of the block) and the table level, machine frame (x right, y away, z up). */
 export function standPlacement(halfSpan: number): { x: number; y: number; tableZ: number; restZ: number } {
   const outerHalf = halfSpan + 3 + WALL / 2;
-  const tableZ = CASE_Z_BOTTOM - PLINTH_HEIGHT;
+  const tableZ = CASE_Z_BOTTOM - PLINTH_HEIGHT - FOOT_HEIGHT;
   return { x: outerHalf + PLINTH_OVERHANG + SIDE_GAP + BLOCK_WIDTH / 2, y: CASE_Y_FRONT + 32, tableZ, restZ: tableZ + BLOCK_HEIGHT + REST_HEIGHT };
 }
 

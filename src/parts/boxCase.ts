@@ -1,8 +1,8 @@
-import { type BoxGeometry, ExtrudeGeometry, Group, Mesh, Path, Shape } from "three";
+import { type BoxGeometry, ExtrudeGeometry, Group, LatheGeometry, Mesh, Path, Shape, Vector2 } from "three";
 import { getMaterial, getWoodMaterial } from "../materials/factory";
 import { at, box, cylinder, named, tag } from "./common";
 import { unevenBox, type WallRelief } from "./unevenBox";
-import { CASE_Y_BACK, CASE_Y_FRONT, CASE_Z_BOTTOM, COVER_WALLS, LID_BOTTOM, PLINTH_HEIGHT, PLINTH_OVERHANG, RIM_HEIGHT, RIM_OUT, WALL, type WallName } from "./case";
+import { CASE_Y_BACK, CASE_Y_FRONT, CASE_Z_BOTTOM, COVER_WALLS, FOOT_HEIGHT, LID_BOTTOM, PLINTH_HEIGHT, PLINTH_OVERHANG, RIM_HEIGHT, RIM_OUT, WALL, type WallName } from "./case";
 
 /** Ledge strip under the lid along the front and back walls (the lid rests on it): width and height, mm. The frame bars at the back must pass beside it when the frame is lifted out. */
 const LEDGE_WIDTH = 2.5;
@@ -95,6 +95,20 @@ export function buildBox(levelCount: number, pitch: number): BoxParts {
   const plank = plinthPlank(2 * (outerHalf + PLINTH_OVERHANG), yLength + 2 * PLINTH_OVERHANG, PLINTH_HEIGHT, getWoodMaterial("wood-plinth", 2 * outerHalf, yLength));
   plank.position.set(0, yMid, CASE_Z_BOTTOM - PLINTH_HEIGHT);
   root.add(named(plank, "plinth"));
+  // four turned feet, flattened bulbs (paper part 20), a little in from the plank's corners
+  const footProfile = [[6.2, 0], [8.4, 0.5], [10.2, 1.8], [10.8, 3.2], [9.8, 4.6], [7.6, 5.6], [6.4, FOOT_HEIGHT + 0.2], [0.001, FOOT_HEIGHT + 0.2]].map(([r, h]) => new Vector2(r, h));
+  const footGeometry = new LatheGeometry(footProfile, 32);
+  footGeometry.rotateX(Math.PI / 2);
+  const footMaterial = getWoodMaterial("wood-plinth", 22, 22);
+  const footX = outerHalf + PLINTH_OVERHANG - 17;
+  for (const sx of [-1, 1]) {
+    for (const sy of [-1, 1]) {
+      const foot = new Mesh(footGeometry, footMaterial);
+      foot.position.set(sx * footX, sy > 0 ? CASE_Y_BACK + PLINTH_OVERHANG - 15 : CASE_Y_FRONT - PLINTH_OVERHANG + 15, CASE_Z_BOTTOM - PLINTH_HEIGHT - FOOT_HEIGHT);
+      foot.castShadow = true;
+      root.add(named(foot, `foot:${sx}:${sy}`));
+    }
+  }
   const walls: Record<WallName, Mesh> = {
     // the side walls stand between the front and back walls: a full-length side wall shared its outer face and its end faces with them (z-fighting at the corners)
     left: named(part(WALL, yLength - 2 * WALL, wallHeight, -wallX, yMid, wallZ, sideWall), "wall:left"),

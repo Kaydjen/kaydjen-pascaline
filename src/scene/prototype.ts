@@ -1,3 +1,4 @@
+import { FOOT_HEIGHT } from "../parts/case";
 import { Group, Vector3 } from "three";
 import { DEFAULT_PARAMS } from "../sim/params";
 import { machineViews } from "./cameraRig";
@@ -107,6 +108,7 @@ export function createPrototype(levelCount: number, lidOn = true, merge = true):
       object: root,
       views: machineViews(levelCount, DEFAULT_PARAMS.levelPitch),
       target: new Vector3(0, 48, -7),
+      groundY: -4.6 - FOOT_HEIGHT,
       cameraOffset: new Vector3(25, 135, 105).multiplyScalar(Math.max(1, spread / 130)),
       extent: Math.max(90, spread * 0.9),
       update(realDelta) {

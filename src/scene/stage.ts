@@ -45,6 +45,8 @@ const MIN_PIXEL_RATIO = 0.75;
 export interface StageContent {
   object: Object3D;
   target: Vector3;
+  /** Height of the table the object stands on (default just under a plinth); the shadow ground and the pool of light lie there. */
+  groundY?: number;
   cameraOffset: Vector3;
   /** Half-size of the area that needs shadows and the nearest allowed zoom. */
   extent: number;
@@ -191,7 +193,7 @@ export function createStage(canvas: HTMLCanvasElement, onFatal: (message: string
   scene.add(rim, rim.target);
 
   // shadow-only ground just under the plinth, plus the faint pool of light
-  const groundY = -4.6;
+  const groundY = content.groundY ?? -4.6;
   const ground = new Mesh(new PlaneGeometry(4000, 4000), new ShadowMaterial({ opacity: 0.55 }));
   ground.rotation.x = -Math.PI / 2;
   ground.position.y = groundY;
