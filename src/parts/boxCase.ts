@@ -1,4 +1,4 @@
-import { type BoxGeometry, ExtrudeGeometry, Group, Mesh, MeshStandardMaterial, Shape } from "three";
+import { type BoxGeometry, ExtrudeGeometry, Group, Mesh, Path, Shape } from "three";
 import { getMaterial, getWoodMaterial } from "../materials/factory";
 import { at, box, cylinder, named, tag } from "./common";
 import { unevenBox, type WallRelief } from "./unevenBox";
@@ -24,6 +24,28 @@ function plinthPlank(width: number, depth: number, height: number, material: Mes
   geometry.translate(0, 0, ROUND);
   const uv = geometry.getAttribute("uv");
   for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) / width + 0.5, uv.getY(i) / depth + 0.5); // top face 0..1 like a box face
+  return new Mesh(geometry, material);
+}
+
+/** The rim: a rectangular ring of the plinth wood with all edges rounded by `bevel` (hole = the walls' outline, origin at the middle of the bottom face). */
+function rimFrame(halfX: number, halfY: number, holeX: number, holeY: number, height: number, bevel: number, material: Mesh["material"]): Mesh {
+  const shape = new Shape();
+  shape.moveTo(-(halfX - bevel), -(halfY - bevel));
+  shape.lineTo(halfX - bevel, -(halfY - bevel));
+  shape.lineTo(halfX - bevel, halfY - bevel);
+  shape.lineTo(-(halfX - bevel), halfY - bevel);
+  shape.closePath();
+  const hole = new Path();
+  hole.moveTo(-(holeX + bevel), -(holeY + bevel));
+  hole.lineTo(-(holeX + bevel), holeY + bevel);
+  hole.lineTo(holeX + bevel, holeY + bevel);
+  hole.lineTo(holeX + bevel, -(holeY + bevel));
+  hole.closePath();
+  shape.holes.push(hole);
+  const geometry = new ExtrudeGeometry(shape, { depth: height - 2 * bevel, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 3 });
+  geometry.translate(0, 0, bevel);
+  const uv = geometry.getAttribute("uv");
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) / (2 * halfX) + 0.5, uv.getY(i) / (2 * halfY) + 0.5);
   return new Mesh(geometry, material);
 }
 
@@ -102,22 +124,14 @@ export function buildBox(levelCount: number, pitch: number): BoxParts {
   walls.front.add(named(part(2 * (innerX - 1.5), LEDGE_WIDTH, LEDGE_HEIGHT, 0, WALL / 2 + LEDGE_WIDTH / 2, ledgeZ - wallZ, rawMaterial), "ledge:front"));
   walls.back.add(named(part(2 * (innerX - 1.5), LEDGE_WIDTH, LEDGE_HEIGHT, 0, -WALL / 2 - LEDGE_WIDTH / 2, ledgeZ - wallZ, rawMaterial), "ledge:back"));
 
-  // a dark wooden rim round the top of the walls, just under the lid, held by brass pins (photo of the whole machine); it never moves
-  // ebonised wood, nearly black against the brass walls: a plain material of its own (no scan, no wear shader), shared by the four parts
-  const rimWood = new MeshStandardMaterial({ color: 0x0e0b09, roughness: 0.9, metalness: 0 });
-  const rimMaterial = (): MeshStandardMaterial => rimWood;
-  const rimZ = LID_BOTTOM - RIM_HEIGHT / 2 - 0.05;
-  const rimDepth = RIM_OUT + 0.6;
+  // a wooden rim round the top of the walls, just under the lid, like the plank under the box (rounded edges, same wood); brass pins hold it
   const rimHalf = outerHalf + RIM_OUT;
   const rimFrontY = CASE_Y_FRONT - RIM_OUT;
   const rimBackY = CASE_Y_BACK + RIM_OUT;
-  const rimPart = (name: string, sx: number, sy: number, x: number, y: number): void => {
-    root.add(named(part(sx, sy, RIM_HEIGHT, x, y, rimZ, rimMaterial()), name));
-  };
-  rimPart("rim:front", 2 * rimHalf, rimDepth, 0, rimFrontY + rimDepth / 2);
-  rimPart("rim:back", 2 * rimHalf, rimDepth, 0, rimBackY - rimDepth / 2);
-  rimPart("rim:left", rimDepth, rimBackY - rimFrontY - 2 * RIM_OUT, -rimHalf + rimDepth / 2, yMid);
-  rimPart("rim:right", rimDepth, rimBackY - rimFrontY - 2 * RIM_OUT, rimHalf - rimDepth / 2, yMid);
+  const rimZ = LID_BOTTOM - RIM_HEIGHT / 2 - 0.05;
+  const rim = rimFrame(rimHalf, (rimBackY - rimFrontY) / 2, outerHalf - WALL, yLength / 2 - WALL, RIM_HEIGHT, 1, getWoodMaterial("wood-plinth", 2 * rimHalf, rimBackY - rimFrontY));
+  rim.position.set(0, yMid, LID_BOTTOM - RIM_HEIGHT - 0.05);
+  root.add(named(rim, "rim"));
   const pinMaterial = getMaterial("brass-brushed");
   const pins: { name: string; x: number; y: number; axis: "x" | "y" }[] = [];
   for (let k = 0; k < 9; k++) {
