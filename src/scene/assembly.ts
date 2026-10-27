@@ -27,7 +27,7 @@ const PANEL_MAX_DT = 1 / 20;
 /** How far a lid pin rises when it is pulled out, mm. */
 const PIN_PULL = 7;
 /** The window glow of a carry: peak opacity (additive), how long it holds at the peak and how long it takes to fade, seconds. */
-const CARRY_GLOW_PEAK = 0.14;
+const CARRY_GLOW_PEAK = 0.21;
 const CARRY_GLOW_HOLD = 0.35;
 const CARRY_GLOW_FADE = 1.3;
 const PIN_STIFFNESS = 900;
