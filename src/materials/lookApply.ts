@@ -2,7 +2,7 @@ import type { MaterialName } from "./factory";
 import type { Look } from "./looks";
 import { CLEAN, metalPreset, NO_SCAN, type ScanSettings, type WearLevel, type WearSettings } from "./wear";
 
-export const METALS: MaterialName[] = ["brass-strip", "bronze-trim", "brass-brushed", "brass-hub", "brass-lever", "brass-spoke", "brass-plate", "brass-lid", "brass-dark", "brass-frame", "brass-forged", "steel-ring", "steel"];
+export const METALS: MaterialName[] = ["brass-strip", "bronze-trim", "brass-brushed", "brass-hub", "brass-lever", "brass-spoke", "brass-plate", "brass-lid", "brass-dark", "brass-frame", "brass-gear", "brass-forged", "steel-ring", "steel"];
 export const WOODS: MaterialName[] = ["wood-dark", "wood-plinth", "wood-raw"];
 
 /** Wear strengths of a material kind at a level (metals full, woods gentler, papers dirtier). */

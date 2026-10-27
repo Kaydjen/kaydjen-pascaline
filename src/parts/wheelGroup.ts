@@ -234,7 +234,6 @@ function buildInputWheelGeometry(): BufferGeometry {
  * wheel and its hub disc and nut. Group frame at the gear-40 disc (axis z); it rotates about z by minus the level angle.
  */
 export function buildWheelGroup(level: number, x: number): Group {
-  const brass = getMaterial("brass-brushed");
   const steel = getMaterial("steel");
   const nutMaterial = getMaterial("brass-forged"); // the nut is a darker olive than the spokes (photos)
   const dirt = getMaterial("brass-dark"); // the dark film in the joints between the layers
@@ -244,11 +243,12 @@ export function buildWheelGroup(level: number, x: number): Group {
   group.name = `wheel:${level}`;
 
   // gear 40: plate, hub boss, ten pins hanging down, and the shaft down to the lower support bar
-  group.add(at(new Mesh(pinWheelPlate(0.8), brass), 0, 0, 0.4));
-  group.add(at(cylinder(PIN_HUB_RADIUS, 1.8, "z", brass, 24), 0, 0, 0.9));
+  const gearBrass = getMaterial("brass-gear");
+  group.add(at(new Mesh(pinWheelPlate(0.8), gearBrass), 0, 0, 0.4));
+  group.add(at(cylinder(PIN_HUB_RADIUS, 1.8, "z", gearBrass, 24), 0, 0, 0.9));
   for (let k = 0; k < DIM.pinCount; k++) {
     const a = (k * STEP_DEG + DIM.inputPinPhaseDeg) * RAD;
-    group.add(at(cylinder(DIM.pinRadius, DIM.inputPinSpanZ, "z", brass, 12), R * Math.sin(a), R * Math.cos(a), -DIM.inputPinSpanZ / 2));
+    group.add(at(cylinder(DIM.pinRadius, DIM.inputPinSpanZ, "z", gearBrass, 12), R * Math.sin(a), R * Math.cos(a), -DIM.inputPinSpanZ / 2));
   }
   group.add(at(shaft(1.5, INPUT_SHAFT_LENGTH, "z", steel), 0, 0, INPUT_SHAFT_BOTTOM + INPUT_SHAFT_LENGTH / 2));
 

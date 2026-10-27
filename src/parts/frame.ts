@@ -1,4 +1,4 @@
-import { BufferGeometry, ExtrudeGeometry, Group, InstancedMesh, Matrix4, Mesh, Path, Shape, SphereGeometry } from "three";
+import { BufferGeometry, CircleGeometry, ExtrudeGeometry, Group, InstancedMesh, Matrix4, Mesh, MeshStandardMaterial, Path, Shape } from "three";
 import { getMaterial } from "../materials/factory";
 import type { MechanismParams } from "../sim/params";
 import { at, BAR, box, named, tag } from "./common";
@@ -112,11 +112,13 @@ function partitionGeometry(): BufferGeometry {
   return geometry;
 }
 
-/** Row of domed rivets facing `dir` (+-1 along y) on a bar face at `faceY`. One draw call. */
+const HOLE_MATERIAL = new MeshStandardMaterial({ color: 0x15110b, metalness: 0, roughness: 1 });
+
+/** Row of small dark holes (museum photos: a row of holes runs along the lower bar) facing `dir` (+-1 along y) on a bar face at `faceY`. One draw call. */
 function rivetRow(xs: number[], faceY: number, dir: number, z: number): InstancedMesh {
-  const geometry = new SphereGeometry(0.9, 8, 4, 0, Math.PI * 2, 0, Math.PI / 2);
-  geometry.rotateX(dir > 0 ? -Math.PI / 2 : Math.PI / 2); // dome pole towards dir
-  const rivets = new InstancedMesh(geometry, getMaterial("brass-brushed"), xs.length);
+  const geometry = new CircleGeometry(1.0, 14);
+  geometry.rotateX(dir > 0 ? -Math.PI / 2 : Math.PI / 2); // disc normal towards dir
+  const rivets = new InstancedMesh(geometry, HOLE_MATERIAL, xs.length);
   const m = new Matrix4();
   xs.forEach((x, k) => rivets.setMatrixAt(k, m.makeTranslation(x, faceY, z)));
   rivets.name = `rivets:${dir > 0 ? "back" : "front"}`;
@@ -165,7 +167,7 @@ export function buildFrame(params: MechanismParams): Group {
   // so that the mechanism reads as one frame standing in the case
   const plateGeometry = frameEndPlate();
   for (const side of [-1, 1] as const) {
-    const plate = tag(new Mesh(plateGeometry, getMaterial("brass-brushed")), "fixed");
+    const plate = tag(new Mesh(plateGeometry, frameMaterial), "fixed");
     plate.name = side < 0 ? "framePlate:left" : "framePlate:right";
     plate.position.x = side * (halfSpan + 0.1) + (side > 0 ? 0 : -FRAME_PLATE_THICKNESS);
     frame.add(plate);

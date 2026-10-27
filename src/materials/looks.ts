@@ -54,7 +54,8 @@ function machineBase(opts: { lid: string; ring: string; small: string; frame: st
     "brass-lever": { metalness: 1, wear, scale: { grimeAmount: 2, scratchAmount: 2, scratchBump: 2 }, set: { grimeScale: 0.35 }, scan: { scan: opts.small, tile: 34, tint: "#c2ae80", normal: 1, roughAdd: -0.04 } },
     "brass-hub": { metalness: 1, wear, scale: HAIRLINES, scan: { scan: opts.frame, tile: 40, tint: "#a8986c", normal: 1, roughAdd: -0.1 } }, // the numeral plate: browner and a little more polished
     "steel-ring": { metalness: 1, wear, scale: { ...HAIRLINES, grimeAmount: 3 }, set: { grimeScale: 0.35 }, scan: { scan: opts.ring, tile: 46, tint: opts.ringTint ?? "#9a94a6", normal: 1 } },
-    "brass-frame": { metalness: 1, wear, scan: { scan: opts.frame, tile: 40, tint: "#9a8a68", normal: 1 } },
+    "brass-frame": { metalness: 1, wear, scan: { scan: opts.frame, tile: 40, tint: "#86845e", normal: 1 } },
+    "brass-gear": { metalness: 1, wear, scale: { grimeAmount: 1.5 }, scan: { scan: opts.small, tile: 34, tint: "#a8a272", normal: 1 } }, // lantern gears and pin cages: yellow-olive, a little lighter than the frame (photos)
     "brass-forged": { metalness: 1, wear, scan: { scan: opts.frame, tile: 40, tint: "#b8a577", normal: 1 } },
     "brass-dark": { metalness: 1, wear, scan: { scan: "Metal008", tile: 90, tint: "#8a7a5c", normal: 1 } },
     steel: { metalness: 1, wear, scan: { scan: "Metal048C", tile: 30, tint: "#a8a090", normal: 1 } },

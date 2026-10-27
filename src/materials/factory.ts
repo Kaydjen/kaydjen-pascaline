@@ -12,6 +12,7 @@ export type MaterialName =
   | "brass-lid"
   | "brass-dark"
   | "brass-frame"
+  | "brass-gear"
   | "brass-forged"
   | "steel-ring"
   | "steel"
@@ -40,6 +41,7 @@ const SPECS: Record<MaterialName, Spec> = {
   "brass-lid": { color: 0xb89a55, metalness: 0.8, roughness: 0.4 },
   "brass-dark": { color: 0x6b5a33, metalness: 0.7, roughness: 0.55 },
   "brass-frame": { color: 0x76673c, metalness: 0.8, roughness: 0.58 },
+  "brass-gear": { color: 0xb89a55, metalness: 0.8, roughness: 0.4 },
   "brass-forged": { color: 0x8a7240, metalness: 0.85, roughness: 0.5 },
   "steel-ring": { color: 0xb3a58c, metalness: 0.75, roughness: 0.38 },
   steel: { color: 0x8f8d88, metalness: 1, roughness: 0.3 },

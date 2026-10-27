@@ -68,7 +68,7 @@ function buildPinWheelPlate(thickness: number): BufferGeometry {
 
 /** Accumulator of one level: gears 45, 48, 50, the bar pair and the horizontal shaft. Origin on the shaft axis, rotates about y. */
 export function buildAccumulator(level: number, params: MechanismParams): Group {
-  const brass = getMaterial("brass-brushed");
+  const brass = getMaterial("brass-gear");
   const steel = getMaterial("steel");
   const acc = tag(new Group(), `acc:${level}`);
   const plateGeometry = pinWheelPlate(0.8);
