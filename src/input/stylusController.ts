@@ -1,7 +1,6 @@
 import { Matrix4, Quaternion, type Ray, Vector2, Vector3 } from "three";
 import { stylusParkedPose } from "../parts/stylus";
 import type { Assembly } from "../scene/assembly";
-import { layout } from "../scene/teardown";
 import { STEP_DEG } from "../sim/params";
 import type { Mechanism } from "../sim/mechanism";
 import {
@@ -23,7 +22,7 @@ import {
 } from "./dialing";
 import type { Hit, HitTester } from "./hits";
 
-/** Where the stylus is: parked in the barrel, held by the pointer, or inserted in a wheel or gear and being dragged. */
+/** Where the stylus is: on its stand, held by the pointer, or inserted in a wheel or gear and being dragged. */
 export type StylusState = "slot" | "hand" | "inserted" | "returning";
 
 /** Source of a stylus pose: the mouse controller and the ghost stylus (demo) both implement it. */
@@ -41,6 +40,7 @@ export interface StylusHost {
 const STIFFNESS = 180;
 /** While inserted the tip follows the wheel much more tightly. */
 const STIFFNESS_INSERTED = 1600;
+const TAKEN_KEY = "pascaline.stylusTaken";
 const Y = new Vector3(0, 1, 0);
 /** Orientation of the parked stylus: the knob (local +y) points to -y, towards the wheels. */
 const PARKED_QUATERNION = new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1), Math.PI);
@@ -73,9 +73,23 @@ export class StylusController implements StylusSource {
     private readonly host: StylusHost,
     private readonly hits: HitTester,
   ) {
-    const park = this.parkedPosition();
-    this.position.copy(park);
-    this.pickUp(); // the stylus is in the hand from the first frame: it follows the pointer, no pick-up step
+    this.position.copy(this.parkedPosition()); // the stylus starts on its stand
+    try {
+      this.taken = localStorage.getItem(TAKEN_KEY) === "1";
+    } catch {
+      // storage unavailable: the highlight shows again
+    }
+    if (new URLSearchParams(location.search).has("hint")) this.taken = false; // ?hint shows the first-visit highlight again (for review)
+  }
+
+  /** The stylus has been taken before (remembered between visits). */
+  private taken = false;
+  /** The stand highlight runs only once the page is visible (the load takes seconds); a rebuilt assembly picks it up from here. */
+  private hintArmed = false;
+
+  /** Called when the scene becomes visible: from now on the stand breathes until the first take. */
+  armHint(): void {
+    this.hintArmed = true;
   }
 
   get dragging(): boolean {
@@ -95,18 +109,26 @@ export class StylusController implements StylusSource {
     return { tip: this.position.clone(), pressed: this.pressed };
   }
 
-  /** Picks the stylus up from its barrel (it flies to the pointer). */
+  /** Picks the stylus up from its stand (it flies to the pointer). */
   pickUp(): void {
     if (this.state !== "slot" && this.state !== "returning") return;
     const assembly = this.host.assembly();
     assembly.stylusParked = false;
+    if (!this.taken) {
+      this.taken = true;
+      try {
+        localStorage.setItem(TAKEN_KEY, "1");
+      } catch {
+        // storage unavailable: nothing to remember
+      }
+    }
     this.position.copy(assembly.stylus.position);
     this.velocity.set(0, 0, 0);
     this.orientation.copy(assembly.stylus.quaternion);
     this.state = "hand";
   }
 
-  /** Esc or a click on a barrel: the stylus goes back to the barrel. */
+  /** Esc or a click on the stand: the stylus goes back to the stand. */
   park(): void {
     if (this.state === "slot") return;
     this.release();
@@ -116,7 +138,6 @@ export class StylusController implements StylusSource {
   /** True when a press at the current pointer was taken by the stylus (so that other click behaviours stay quiet). */
   press(hit: Hit | null): boolean {
     void hit;
-    if (this.state === "slot") this.pickUp(); // the stylus is always in the hand; this only covers a parked one
     if (this.state === "hand") {
       if (this.over) {
         this.insert(this.over.dial, this.over.gap);
@@ -135,10 +156,9 @@ export class StylusController implements StylusSource {
   }
 
   private parkedPosition(): Vector3 {
-    const assembly = this.host.assembly();
-    const params = assembly.mechanismParams();
+    const params = this.host.assembly().mechanismParams();
     const park = stylusParkedPose((params.levelCount * params.levelPitch) / 2);
-    return new Vector3(park.x, park.y + (assembly.slideOffset() - 4.5), park.z + layout(this.host.teardown()).lidZ);
+    return new Vector3(park.x, park.y, park.z);
   }
 
   private insert(dial: Dial, gap: number): void {
@@ -194,17 +214,30 @@ export class StylusController implements StylusSource {
     this.over = { dial, gap };
   }
 
-  /** Keeps the hovering stylus over the machine: a grazing ray (camera low or looking down) must not throw it into space. */
-  private clampToStage(p: Vector3): Vector3 {
+  /** True when a point of the hover plane lies over the machine (a grazing ray from a low camera meets the plane far away). */
+  private onStage(p: Vector3): boolean {
     const params = this.host.assembly().mechanismParams();
     const halfX = (params.levelCount * params.levelPitch) / 2 + 40;
-    p.x = Math.min(Math.max(p.x, -halfX), halfX);
-    p.y = Math.min(Math.max(p.y, -80), 95);
-    return p;
+    return Math.abs(p.x) <= halfX && p.y >= -80 && p.y <= 95;
+  }
+
+  /**
+   * Where the stylus hovers when the pointer is not over the hover plane (camera low, looking at the walls): just in front of the
+   * surface under the pointer, or at the depth of the machine when the pointer is over empty space. It follows the pointer on screen.
+   */
+  private surfaceTarget(): Vector3 | null {
+    if (!this.pointer) return null;
+    const machine = this.host.assembly().machine;
+    machine.updateWorldMatrix(true, false);
+    const ray = this.hits.ray(this.pointer);
+    const hit = this.hits.pick(this.pointer, (name) => name !== "stylus");
+    const depth = hit ? Math.max(hit.distance - 8, 5) : ray.origin.distanceTo(machine.getWorldPosition(new Vector3()));
+    return machine.worldToLocal(ray.at(depth, new Vector3()));
   }
 
   update(dt: number): void {
     const assembly = this.host.assembly();
+    assembly.standHint = this.hintArmed && !this.taken;
     const step = Math.min(dt, 1 / 30);
     if (this.state === "slot") {
       assembly.stylusParked = true;
@@ -234,7 +267,7 @@ export class StylusController implements StylusSource {
       } else {
         const ray = this.localRay();
         const p = ray ? intersectPlane(ray, "z", hoverZ(s)) : null;
-        target = p ? this.clampToStage(p) : this.position.clone();
+        target = p && this.onStage(p) ? p : (this.surfaceTarget() ?? this.position.clone());
         if (dialKind(s) === "gear") axis = AXIS_GEAR;
       }
     } else {

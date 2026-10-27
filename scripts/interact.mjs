@@ -100,7 +100,29 @@ async function dialGear(level, steps) {
 }
 
 // 1. stylus pick-up
-check("the stylus is in the hand from the start (no pick-up step)", (await page.evaluate(() => window.__app.stylus.state)) === "hand");
+check("the stylus starts on its stand", (await page.evaluate(() => window.__app.stylus.state)) === "slot");
+const standSpot = await page.evaluate(() => {
+  const p = window.__proto.assembly.stylus.position;
+  return { x: p.x, y: p.y - 22, z: p.z };
+});
+const standPoint = await project(standSpot.x, standSpot.y, standSpot.z);
+await page.mouse.move(standPoint.x, standPoint.y, { steps: 8 });
+await settle(400);
+check("hovering the stand shows the grab cursor", (await page.evaluate(() => document.querySelector("canvas").style.cursor)) === "grab");
+await page.mouse.click(standPoint.x, standPoint.y);
+await settle(300);
+check("a click on the stand takes the stylus", (await page.evaluate(() => window.__app.stylus.state)) === "hand");
+await page.mouse.move(800, 400, { steps: 4 });
+await settle(300);
+check("no system cursor over the scene while the stylus is in the hand", (await page.evaluate(() => document.getElementById("scene").style.cursor)) === "none");
+const dockButton = await page.evaluate(() => {
+  const r = document.querySelector(".dock button").getBoundingClientRect();
+  return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+});
+await page.mouse.move(dockButton.x, dockButton.y - 40, { steps: 10 });
+await settle(300);
+check("the cursor is back 40 px above a dock button", (await page.evaluate(() => document.getElementById("scene").style.cursor)) === "default");
+await page.mouse.move(800, 400, { steps: 6 });
 check("six wheels by default", await page.evaluate(() => window.__proto.levelCount === 6));
 
 // 2. dial 3 on the units wheel
@@ -180,7 +202,7 @@ const dockOnly = await page.evaluate(() => {
   const visible = [...document.body.children].filter((e) => !["SCRIPT", "CANVAS"].includes(e.tagName) && e.id !== "veil" && getComputedStyle(e).display !== "none" && !e.classList.contains("sr-only") && getComputedStyle(e).opacity !== "0" && e.getBoundingClientRect().width > 2);
   return visible.map((e) => e.className || e.id || e.tagName);
 });
-check("rest state shows only the dock and the hint line", dockOnly.every((c) => c === "dock" || c === "hint visible" || c === "loading-line"), JSON.stringify(dockOnly));
+check("rest state shows only the dock and the hint line", dockOnly.every((c) => c === "dock" || c === "hint visible"), JSON.stringify(dockOnly));
 await page.screenshot({ path: join(out, "03-rest.png") });
 const label = await project(-20, 21.7, 48.2);
 await page.mouse.move(label.x, label.y);

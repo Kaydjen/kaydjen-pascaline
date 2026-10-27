@@ -10,6 +10,7 @@ import { buildFrame, buildUnderLidBar } from "../parts/frame";
 import { buildAccumulator } from "../parts/gears";
 import { attachPrimitiveProxies, hitBox } from "../parts/proxies";
 import { buildStylus, stylusParkedPose } from "../parts/stylus";
+import { buildStylusStand, STAND_VARIANTS, standPlacement } from "../parts/stylusStand";
 import { buildWheelGroup } from "../parts/wheelGroup";
 import { mergeStatic } from "./mergeStatic";
 import { layout } from "./teardown";
@@ -80,8 +81,12 @@ export class Assembly {
   readonly frame: Group;
   readonly lidAssembly = new Group();
   readonly stylus = new Group();
-  /** True while the stylus rests in the right barrel: it then rides with the sliding strip. The stylus controller clears it. */
+  /** True while the stylus rests on its stand (fixed on the table). The stylus controller clears it. */
   stylusParked = true;
+  /** First visit: the stand breathes quietly until the stylus is taken for the first time. Set by the stylus controller. */
+  standHint = false;
+  private standGlow!: Sprite;
+  private standClock = 0;
   private readonly levels: LevelParts[] = [];
   private readonly bounce: { t: number; amp: number; previous: number }[] = [];
   private readonly boxParts: BoxParts;
@@ -141,6 +146,16 @@ export class Assembly {
     for (const rigid of [this.box, this.frame, this.lidAssembly, this.stylus, this.lidParts.lid, this.lidParts.label, this.lidParts.slider]) rigid.userData.rigid = true;
     this.addHits(n, params.levelPitch);
     this.stylus.add(buildStylus());
+    const standVariant = typeof location === "undefined" ? null : new URLSearchParams(location.search).get("stand");
+    const stand = buildStylusStand(STAND_VARIANTS.find((v) => v === standVariant) ?? "saddle");
+    this.standGlow = new Sprite(new SpriteMaterial({ map: glowTexture(), color: new Color(0xb8924a).multiplyScalar(2.2), blending: AdditiveBlending, transparent: true, depthWrite: false, toneMapped: false, opacity: 0 }));
+    this.standGlow.scale.set(40, 40, 1);
+    this.standGlow.position.set(0, 0, standPlacement(this.levelHalfSpan()).restZ - standPlacement(this.levelHalfSpan()).tableZ);
+    stand.add(this.standGlow); // always "visible" at opacity 0: its shader program is built with the others, not at the first breath
+    const standAt = standPlacement(this.levelHalfSpan());
+    stand.position.set(standAt.x, standAt.y, standAt.tableZ);
+    stand.userData.rigid = true;
+    machine.add(stand);
     const park = stylusParkedPose(this.levelHalfSpan());
     this.stylus.position.set(park.x, park.y, park.z);
     this.stylus.rotation.z = park.yaw;
@@ -240,8 +255,7 @@ export class Assembly {
       sprite.scale.set(11, 11, 1);
       sprite.position.set(x, y, z);
       sprite.renderOrder = 10;
-      sprite.visible = false;
-      parent.add(sprite);
+      parent.add(sprite); // stays visible at opacity 0 so that its program is compiled with the rest (a first-use compile froze the page)
       return { sprite, level };
     };
     this.glows[level] = { lift: make(body, -1.7, 10, armReach - 1), kick: make(sautoirLever, 10, 0, -3.5), previousLift: 0 };
@@ -308,7 +322,6 @@ export class Assembly {
       const material = g.sprite.material;
       const next = material.opacity + ((wanted ? 1 : 0) - material.opacity) * (1 - Math.exp(-Math.max(dt, 0) / 0.08));
       material.opacity = next < 0.01 && !wanted ? 0 : next;
-      g.sprite.visible = material.opacity > 0;
     };
     fade(glow.lift, carry.phase === "contact" && rising && lift > 0.3);
     fade(glow.kick, carry.phase === "kicking");
@@ -339,10 +352,17 @@ export class Assembly {
     }
     this.lidParts.slider.position.y = this.panelOffset;
 
+    const glowMaterial = this.standGlow.material;
+    if (!this.standHint) this.standClock = 0; // the breathing starts from its dimmest point whenever it (re)starts
+    else this.standClock += Math.max(dt, 0);
+    const wanted = this.standHint && this.stylusParked ? 0.07 + 0.33 * (0.5 - 0.5 * Math.cos((2 * Math.PI * this.standClock) / 4)) : 0;
+    glowMaterial.opacity += (wanted - glowMaterial.opacity) * (1 - Math.exp(-Math.max(dt, 0) / 0.3));
+    if (wanted === 0 && glowMaterial.opacity < 0.005) glowMaterial.opacity = 0;
+
     const params = this.mechanism.params;
     if (this.stylusParked) {
       const park = stylusParkedPose(this.levelHalfSpan());
-      this.stylus.position.set(park.x, park.y + (this.panelOffset - BAR_TRAVEL), park.z + this.lidAssembly.position.z);
+      this.stylus.position.set(park.x, park.y, park.z);
     }
     this.levels.forEach((parts, i) => {
       const u = pose.u[i]! + this.settleOf(i, pose.u[i]!, simDt);

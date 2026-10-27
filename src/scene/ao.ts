@@ -21,6 +21,8 @@ export interface AoSettings {
 export interface AoHandle {
   gtao: GTAOPass;
   blend: ShaderMaterial;
+  /** Resolves when the occlusion shaders are built and the pass is switched on. */
+  ready: Promise<void>;
 }
 
 /** Multiplies the frame by the occlusion, less so where the frame is bright (the stock blend cannot see the frame, so this one reads it). */
@@ -41,8 +43,12 @@ void main() {
 
 /** The additive pool under the machine is tone mapped when the frame goes through the composer, so it is dimmed then. */
 const POOL_OPACITY_AO = 0.22;
-/** Quality step from which the frame is rendered plainly again (the stage steps down when the machine is too slow). */
-const PLAIN_FROM_QUALITY = 2;
+/**
+ * Quality step from which the frame is rendered plainly again. Never: the plain render goes to the screen, whose shader programs
+ * differ from the composer's and are not built up front, so the switch froze the page for seconds on a slow machine. Slower machines
+ * only lose pixel ratio and shadow size.
+ */
+const PLAIN_FROM_QUALITY = Infinity;
 
 /** The render target of the occlusion composer (also given to the stage so that the shaders are compiled for it). */
 export function createAoTarget(renderer: WebGLRenderer): WebGLRenderTarget {
@@ -104,8 +110,8 @@ export function installAo(debug: StageDebug, settings: AoSettings, target: WebGL
   renderer.setRenderTarget(target);
   const compiled = renderer.compileAsync(probe, camera);
   renderer.setRenderTarget(null);
-  void compiled.then(() => {
+  const ready = compiled.then(() => {
     gtao.enabled = true;
   });
-  return { gtao, blend };
+  return { gtao, blend, ready };
 }

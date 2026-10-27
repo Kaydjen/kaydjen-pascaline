@@ -40,6 +40,7 @@ export function mountKeyboard(ctx: KeyboardContext): () => void {
         break;
       case "Escape":
         ctx.ghost.cancel();
+        ctx.stylus.park();
         break;
       case "ArrowRight":
       case "ArrowLeft": {

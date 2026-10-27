@@ -8,8 +8,20 @@ import type { StylusController } from "./stylusController";
 
 /** A press that moved less than this many pixels is a click. */
 const CLICK_SLOP = 5;
-/** The cursor only changes after the pointer has rested on a target this long (seconds). */
-const HOVER_DELAY = 0.08;
+
+/** How far (px) around a dock button the pointer already counts as "at the dock": the cursor returns before the button is reached. */
+const DOCK_MARGIN = 56;
+
+function nearButtons(x: number, y: number): boolean {
+  for (const button of document.querySelectorAll(".dock button")) {
+    const r = button.getBoundingClientRect();
+    if (r.width > 0 && x >= r.left - DOCK_MARGIN && x <= r.right + DOCK_MARGIN && y >= r.top - DOCK_MARGIN && y <= r.bottom + DOCK_MARGIN) return true;
+  }
+  return false;
+}
+
+/** The sliding strip and its two rolled ends (the handles people reach for). */
+const isStripHandle = (name: string | undefined): boolean => name === "strip" || name === "barrel:0" || name === "barrel:1";
 
 export interface PointerContext {
   canvas: HTMLCanvasElement;
@@ -29,10 +41,9 @@ export class PointerRouter {
   private readonly ndc = new Vector2();
   private inside = false;
   private down: { x: number; y: number; hit: Hit | null } | null = null;
-  private cursor = "";
-  private pendingCursor = "";
-  private pendingFor = 0;
   private locked = false;
+  /** The pointer is on or near a dock button: the stylus stays where it is and the system cursor is back. */
+  private uiZone = false;
 
   constructor(private readonly ctx: PointerContext) {
     const { canvas } = ctx;
@@ -56,8 +67,9 @@ export class PointerRouter {
     this.client = { x: event.clientX, y: event.clientY };
     const rect = this.ctx.canvas.getBoundingClientRect();
     this.ndc.set(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1);
-    this.inside = true;
-    if (!this.ctx.ghost.running) this.ctx.stylus.setPointer(this.ndc); // the ghost stylus owns the pointer while it runs
+    this.uiZone = nearButtons(event.clientX, event.clientY);
+    this.inside = !this.uiZone;
+    if (!this.ctx.ghost.running && !this.ctx.stylus.dragging) this.ctx.stylus.setPointer(this.uiZone ? null : this.ndc); // the ghost stylus owns the pointer while it runs
   }
 
   /** The target under the pointer for click purposes (the stylus in hand never blocks the view). */
@@ -121,30 +133,26 @@ export class PointerRouter {
 
   /** The only click behaviour left: the sliding strip flips between adding and subtracting. Everything else is the stylus. */
   private click(hit: Hit | null): void {
-    if (hit?.name === "strip") this.ctx.session.setVisibleRow(this.ctx.session.visibleRow === "ascending" ? "descending" : "ascending");
+    const { stylus } = this.ctx;
+    if (hit?.name === "stand" || hit?.name === "stylus") {
+      if (stylus.state === "slot" || stylus.state === "returning") stylus.pickUp();
+      else if (stylus.state === "hand") stylus.park();
+      return;
+    }
+    if (isStripHandle(hit?.name)) this.ctx.session.setVisibleRow(this.ctx.session.visibleRow === "ascending" ? "descending" : "ascending");
   }
 
   /** Target under the pointer this frame (null when the pointer is outside), and the pointer in client pixels. */
   hovered: Hit | null = null;
   client = { x: 0, y: 0 };
 
-  /** Called every frame: hover target, lamp and the cursor with its delay. */
-  update(dt: number): void {
+  /** Called every frame: hover target and the cursor. */
+  update(): void {
     const { stylus, canvas } = this.ctx;
-    const hit = this.inside ? this.pick() : null;
-    this.hovered = hit;
-    let wanted = "";
-    if (stylus.state === "inserted") wanted = "grabbing";
-    else if (stylus.state === "hand" && stylus.hovered) wanted = "grab";
-    else if (hit?.name === "strip") wanted = "pointer";
-    if (wanted !== this.pendingCursor) {
-      this.pendingCursor = wanted;
-      this.pendingFor = 0;
-    } else this.pendingFor += dt;
-    const immediate = stylus.state === "inserted" || wanted === "";
-    if (wanted !== this.cursor && (immediate || this.pendingFor >= HOVER_DELAY)) {
-      this.cursor = wanted;
-      canvas.style.cursor = wanted;
-    }
+    this.hovered = this.inside ? this.pick() : null;
+    // the stylus in the hand is the pointer: no system cursor then; while it rests on its stand the cursor is there to find it
+    const inHand = (stylus.state === "hand" || stylus.state === "inserted") && !this.uiZone;
+    const wanted = this.uiZone ? "default" : inHand ? "none" : this.hovered?.name === "stand" || this.hovered?.name === "stylus" ? "grab" : isStripHandle(this.hovered?.name) ? "pointer" : "";
+    if (canvas.style.cursor !== wanted) canvas.style.cursor = wanted;
   }
 }

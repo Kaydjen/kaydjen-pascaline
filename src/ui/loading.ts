@@ -4,16 +4,16 @@ export interface Loading {
   done(): void;
 }
 
-/** Loading: black screen; a 1 px brass line grows along the bottom if generation takes longer than 400 ms. No spinner. */
+/** Loading: black screen with three brass dots pulsing in turn in the centre, shown if the load takes longer than 150 ms. No text. */
 export function showLoading(): Loading {
-  const line = el("div", { class: "loading-line", attrs: { "aria-hidden": "true" } });
-  document.body.append(line);
-  const timer = window.setTimeout(() => line.classList.add("growing"), 400);
+  const dots = el("div", { class: "loading-dots", attrs: { "aria-hidden": "true" }, children: [el("i", {}), el("i", {}), el("i", {})] });
+  document.body.append(dots);
+  const timer = window.setTimeout(() => dots.classList.add("shown"), 150);
   return {
     done() {
       window.clearTimeout(timer);
-      line.classList.add("finished");
-      window.setTimeout(() => line.remove(), 600);
+      dots.classList.remove("shown");
+      window.setTimeout(() => dots.remove(), 700);
     },
   };
 }

@@ -15,7 +15,7 @@ import { chromium } from "playwright-core";
 import sharp from "sharp";
 
 const args = process.argv.slice(2);
-const flag = (name) => args.find((a) => a.startsWith(`--${name}=`))?.split("=")[1];
+const flag = (name) => args.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);
 const configPath = flag("config");
 if (!configPath) {
   console.log("usage: npm run sheet -- --config=scripts/sheets/<file>.mjs [--out=file.png] [--w=500] [--variants=a,b] [--views=x,y]");
@@ -53,7 +53,7 @@ const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
 const errors = [];
 page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
 page.on("pageerror", (e) => errors.push(String(e)));
-await page.goto(`http://localhost:${port}/?levels=${flag("levels") ?? 6}${config.nomerge ? "&nomerge" : ""}`, { waitUntil: "load" });
+await page.goto(`http://localhost:${port}/?levels=${flag("levels") ?? 6}${config.nomerge ? "&nomerge" : ""}${flag("query") ? "&" + flag("query") : ""}`, { waitUntil: "load" });
 await page.waitForFunction(() => window.__stage && window.__tune && window.__proto, null, { timeout: 90000 });
 await page.waitForFunction(() => document.getElementById("scene")?.classList.contains("ready"), null, { timeout: 90000 });
 await page.addStyleTag({ content: "body > *:not(canvas) { display: none !important; }" });

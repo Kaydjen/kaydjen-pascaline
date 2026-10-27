@@ -40,7 +40,7 @@ const SHOTS = [
   { name: "11-frame", pos: [60, 40, 230], target: [0, 15, 0], js: "__proto.setCover('lid', false); __proto.setCover('wall:front', false)" },
   { name: "12-output", pos: [125, 85, 20], target: [100, 58, -30], js: "__proto.setCover('lid', false); __proto.setCover('wall:front', false)" },
   { name: "13-output-side", pos: [175, 70, -30], target: [100, 55, -30], js: "__proto.setCover('lid', false); __proto.setCover('wall:right', false)" },
-  { name: "20-stylus", pos: [135, 120, -40], target: [105, 50, 5] },
+  { name: "20-stylus", pos: [215, 45, 120], target: [144, 4, 8] },
   { name: "14-strip-end", pos: [-95, 90, 40], target: [-112, 48, -35] },
   { name: "10-drums", pos: [90, 150, -90], target: [100, 28, -39], js: "__proto.setCover('lid', false)" },
 ];

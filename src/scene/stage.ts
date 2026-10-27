@@ -28,12 +28,18 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { createCameraRig, MAX_POLAR, type CameraRig, type MachineViews } from "./cameraRig";
 
 const BACKGROUND = 0x0b0a09;
-/** Quality steps: pixel ratio cap and shadow map size; the stage steps down after 2 s above 20 ms per frame and never up. */
+/**
+ * Quality steps: share of the base pixel ratio and shadow map size; the stage steps down after 2 s above 20 ms per frame and never up.
+ * The base ratio is the screen's, capped so that the frame has at most PIXEL_BUDGET pixels (about 1.5 x Full HD) but never below 1:
+ * Full HD stays sharp, a 4K screen at 225 % is drawn at about 1.35 and scaled up, which still looks fine and keeps a laptop GPU at 60 fps.
+ */
 const QUALITY = [
-  { dpr: 2, shadow: 4096 },
-  { dpr: 1.5, shadow: 2048 },
-  { dpr: 1, shadow: 2048 },
+  { scale: 1, shadow: 4096 },
+  { scale: 0.8, shadow: 2048 },
+  { scale: 0.65, shadow: 2048 },
 ] as const;
+const PIXEL_BUDGET = 3_000_000;
+const MIN_PIXEL_RATIO = 0.75;
 
 /** What a stage shows: one object plus how to frame it. Sizes are millimetres. */
 export interface StageContent {
@@ -83,6 +89,12 @@ export interface StageDebug {
   locked: boolean;
   /** Index into the quality steps (0 = best). */
   quality: number;
+  /** Adaptive quality runs only while this is set (the caller turns it on once the first frames are over). */
+  adaptive: boolean;
+  /** Brightness of the frame, 0 (black, the page is loading) to 1; the caller ramps it up for the reveal. */
+  fade: number;
+  /** One quality step down (pixel ratio, shadow map); false when already at the lowest. */
+  lowerQuality(): boolean;
   /** When set, it draws the frame instead of the plain render (the lab uses it for ambient occlusion). */
   postRender: ((delta: number) => void) | null;
   /** Scene and lights, for the lab. */
@@ -211,7 +223,7 @@ export function createStage(canvas: HTMLCanvasElement, onFatal: (message: string
   const rig = content.views ? createCameraRig(camera, controls, content.views) : null;
   rig?.setPreset("default", { instant: true });
   const keyOffset = key.position.clone().sub(content.target);
-  const debug: StageDebug = { camera, controls, renderer, rig, frames: 0, locked: false, quality: 0, postRender: null, scene, lights: { key, fill, rim }, pool };
+  const debug: StageDebug = { camera, controls, renderer, rig, frames: 0, locked: false, quality: 0, adaptive: false, fade: 0, lowerQuality: () => false, postRender: null, scene, lights: { key, fill, rim }, pool };
 
   // Camera spike (b): a capture-phase listener on the canvas runs before OrbitControls' own.
   const raycaster = new Raycaster();
@@ -240,7 +252,8 @@ export function createStage(canvas: HTMLCanvasElement, onFatal: (message: string
   const resize = (): void => {
     const width = window.innerWidth;
     const height = window.innerHeight;
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, QUALITY[debug.quality]!.dpr));
+    const base = Math.max(1, Math.min(window.devicePixelRatio, 2, Math.sqrt(PIXEL_BUDGET / (width * height))));
+    renderer.setPixelRatio(Math.max(MIN_PIXEL_RATIO, Math.min(base * QUALITY[debug.quality]!.scale, window.devicePixelRatio)));
     renderer.setSize(width, height, false);
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
@@ -260,6 +273,15 @@ export function createStage(canvas: HTMLCanvasElement, onFatal: (message: string
   let handle = 0;
   let running = false;
 
+  debug.lowerQuality = (): boolean => {
+    if (debug.quality >= QUALITY.length - 1) return false;
+    debug.quality++;
+    key.shadow.mapSize.set(QUALITY[debug.quality]!.shadow, QUALITY[debug.quality]!.shadow);
+    key.shadow.map?.dispose();
+    key.shadow.map = null;
+    resize();
+    return true;
+  };
   let frameTime = 1 / 60;
   let slowFor = 0;
   const frame = (now: number): void => {
@@ -267,16 +289,15 @@ export function createStage(canvas: HTMLCanvasElement, onFatal: (message: string
     const delta = (now - last) / 1000;
     last = now;
     // adaptive quality: a smoothed frame time above 20 ms for 2 s lowers the pixel ratio and the shadow map one step
-    frameTime += (Math.min(delta, 0.25) - frameTime) * 0.05;
-    slowFor = frameTime > 0.02 ? slowFor + delta : 0;
-    if (slowFor > 2 && debug.quality < QUALITY.length - 1) {
-      debug.quality++;
+    // (it only starts once the page is shown: the hitching first frames are load, not a slow GPU, and must not cost quality)
+    if (!debug.adaptive) {
+      frameTime = 1 / 60;
       slowFor = 0;
-      key.shadow.mapSize.set(QUALITY[debug.quality]!.shadow, QUALITY[debug.quality]!.shadow);
-      key.shadow.map?.dispose();
-      key.shadow.map = null;
-      resize();
+    } else {
+      frameTime += (Math.min(delta, 0.25) - frameTime) * 0.05;
+      slowFor = frameTime > 0.02 ? slowFor + Math.min(delta, 0.25) : 0;
     }
+    if (slowFor > 2 && debug.lowerQuality()) slowFor = 0;
     content.update?.(delta);
 
     // Near/far follow the orbit distance to keep depth precision at close-up zoom.
@@ -290,8 +311,12 @@ export function createStage(canvas: HTMLCanvasElement, onFatal: (message: string
     // the key light follows what the camera looks at (the exploded stack, a close-up)
     key.target.position.copy(controls.target);
     key.position.copy(controls.target).add(keyOffset);
+    // the reveal is a brightness ramp inside the frame: a CSS fade over a 4K canvas halved the frame rate of a laptop GPU while it ran
+    const exposure = renderer.toneMappingExposure;
+    renderer.toneMappingExposure = exposure * debug.fade;
     if (debug.postRender) debug.postRender(delta);
     else renderer.render(scene, camera);
+    renderer.toneMappingExposure = exposure;
     if (debug.frames < 2) performance.mark(`frame${debug.frames + 1}`);
     debug.frames++;
   };

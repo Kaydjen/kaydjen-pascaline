@@ -127,6 +127,7 @@ export function installLook(look: Look): LookRuntime {
       bakeLidFootprint(renderer, scene, GRIME_BLUR_MM);
       const ao = look.ao?.on && aoTarget ? installAo(debug, look.ao, aoTarget) : null;
       if (import.meta.env.DEV) void import("../dev/tune").then((m) => m.mountTune(debug, ao, tuneMaterial));
+      await ao?.ready; // the pass is on before the page is shown: its first frames (the normal pass builds its own programs) hitch
     },
   };
 }
