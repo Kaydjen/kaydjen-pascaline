@@ -13,7 +13,7 @@ import { buildStylus, stylusParkedPose } from "../parts/stylus";
 import { buildStylusStand, STAND_VARIANTS, standPlacement } from "../parts/stylusStand";
 import { buildWheelGroup } from "../parts/wheelGroup";
 import { mergeStatic } from "./mergeStatic";
-import { layout } from "./teardown";
+import { ASSEMBLED_S, layout } from "./teardown";
 
 const RAD = Math.PI / 180;
 /**
@@ -23,6 +23,8 @@ const RAD = Math.PI / 180;
 const PANEL_OMEGA = 13;
 const PANEL_DAMPING = 2 * 0.7 * PANEL_OMEGA;
 const PANEL_MAX_DT = 1 / 20;
+/** How far a lid pin rises when it is pulled out, mm. */
+const PIN_PULL = 7;
 const ACCENT = 0x5fb3a1;
 
 /** Soft round glow for the contact lamps (accent colour, additive, shown only while a contact works). */
@@ -173,6 +175,32 @@ export class Assembly {
   }
 
   private teardownAmount = 0;
+  /** The four locating pins of the lid (clicked out one by one), their wanted state and how far each is pulled up now, mm. */
+  private readonly pinOut = [false, false, false, false];
+  private readonly pinLift = [0, 0, 0, 0];
+  private lidWasUp = false;
+
+  /** Pulls a lid pin out (or pushes it back); returns how many pins are out now. */
+  togglePin(k: number): number {
+    if (k >= 0 && k < this.pinOut.length) this.pinOut[k] = !this.pinOut[k];
+    return this.pinOut.filter(Boolean).length;
+  }
+
+  private updatePins(dt: number): void {
+    // once the lid has come up and gone back down, the pins drop into the frame ears again
+    if (this.teardownAmount >= ASSEMBLED_S) this.lidWasUp = true;
+    else if (this.lidWasUp) {
+      this.lidWasUp = false;
+      this.pinOut.fill(false);
+    }
+    this.pinLift.forEach((lift, k) => {
+      const wanted = this.pinOut[k] ? PIN_PULL : 0;
+      const next = Math.abs(wanted - lift) < 0.01 ? wanted : lift + (wanted - lift) * (1 - Math.exp(-Math.max(dt, 0) / 0.09));
+      this.pinLift[k] = next;
+      const clip = this.lidParts.lid.getObjectByName(`lidClip:${k}`);
+      if (clip) clip.position.z = LID_TOP + next;
+    });
+  }
 
   /** Exploded view, 0 = assembled .. 1 = fully apart (see teardown.ts). */
   setTeardown(s: number): void {
@@ -352,6 +380,7 @@ export class Assembly {
     }
     this.lidParts.slider.position.y = this.panelOffset;
 
+    this.updatePins(dt);
     const glowMaterial = this.standGlow.material;
     if (!this.standHint) this.standClock = 0; // the breathing starts from its dimmest point whenever it (re)starts
     else this.standClock += Math.max(dt, 0);

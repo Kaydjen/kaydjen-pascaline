@@ -1,4 +1,5 @@
 import { Vector2 } from "three";
+import { NO_LID_S } from "../scene/teardown";
 import type { PrototypeSession } from "../scene/prototype";
 import type { Stage } from "../scene/stage";
 import type { TeardownPlayer } from "../scene/teardownPlayer";
@@ -78,7 +79,8 @@ export class PointerRouter {
   private pick(): Hit | null {
     const { stylus, hits } = this.ctx;
     const inHand = stylus.state === "hand" || stylus.state === "inserted";
-    return hits.pick(this.ndc, (name) => !(inHand && name === "stylus"));
+    // the lid pins are small and sit close behind the strip ends: they win over the larger targets in front of them
+    return hits.pick(this.ndc, (name) => name.startsWith("pin:")) ?? hits.pick(this.ndc, (name) => !(inHand && name === "stylus"));
   }
 
   private lockCamera(on: boolean): void {
@@ -147,6 +149,12 @@ export class PointerRouter {
       else if (stylus.state === "hand") stylus.park();
       return;
     }
+    if (hit?.name.startsWith("pin:") && !stylus.cursorMode) {
+      // the four lid pins: the fourth one out lifts the lid
+      const out = this.ctx.session.assembly.togglePin(Number(hit.name.split(":")[1]));
+      if (out === 4) this.ctx.player.play(NO_LID_S);
+      return;
+    }
     if (isStripHandle(hit?.name)) this.ctx.session.setVisibleRow(this.ctx.session.visibleRow === "ascending" ? "descending" : "ascending");
   }
 
@@ -169,7 +177,8 @@ export class PointerRouter {
     // lid up: the stylus rests, the pointer itself grabs wheels and gears
     const onDial = stylus.cursorMode && (stylus.dragging || stylus.hovered !== null);
     const onStylus = (this.hovered?.name === "stand" || this.hovered?.name === "stylus");
-    const wanted = this.uiZone ? "default" : inHand ? "none" : onDial ? (stylus.dragging ? "grabbing" : "grab") : onStylus ? "grab" : isStripHandle(this.hovered?.name) ? "pointer" : "";
+    const onPin = !stylus.cursorMode && this.hovered?.name.startsWith("pin:") === true;
+    const wanted = this.uiZone ? "default" : inHand ? "none" : onDial ? (stylus.dragging ? "grabbing" : "grab") : onStylus ? "grab" : onPin || isStripHandle(this.hovered?.name) ? "pointer" : "";
     if (canvas.style.cursor !== wanted) canvas.style.cursor = wanted;
   }
 }

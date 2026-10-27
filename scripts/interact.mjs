@@ -171,6 +171,22 @@ check("a click on the stylus with the lid up closes the machine and takes it", a
 await page.evaluate(() => window.__proto.setTeardown(0));
 await page.waitForTimeout(2500);
 
+// 4b. the four lid pins: each click pulls one out, the fourth lifts the lid
+for (const [k, [px, py]] of [[-117.1, -33], [117.1, -33], [-117.1, 49.5], [117.1, 49.5]].entries()) {
+  const at = await project(px, py, 50);
+  await page.mouse.move(at.x, at.y, { steps: 6 });
+  await settle(300);
+  await page.mouse.click(at.x, at.y);
+  await page.waitForTimeout(700);
+  const state = await page.evaluate(() => [window.__proto.teardown, ...[0, 1, 2, 3].map((i) => window.__proto.assembly.lidParts.lid.getObjectByName(`lidClip:${i}`).position.z)]);
+  check(`pin ${k + 1} pulled out, lid still closed`, state[k + 1] > 46.8 + 1, JSON.stringify(state));
+}
+await page.waitForTimeout(3500);
+check("the fourth pin lifts the lid", await page.evaluate(() => Math.abs(window.__proto.teardown - 0.4) < 0.02 && window.__app.stylus.state === "slot"));
+await page.evaluate(() => window.__proto.setTeardown(0));
+await page.waitForTimeout(2500);
+check("closing puts the pins back", await page.evaluate(() => Math.abs(window.__proto.assembly.lidParts.lid.getObjectByName("lidClip:0").position.z - 46.8) < 0.05));
+
 // 5. the view steps in the dock and the arrow keys
 await page.click("text=Lid off");
 await page.waitForTimeout(3500);

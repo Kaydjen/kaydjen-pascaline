@@ -19,6 +19,7 @@ import {
   Vector2,
   type Material,
 } from "three";
+import { hitBox } from "./proxies";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { getMaterial } from "../materials/factory";
 import { FONT_LABEL } from "../materials/fonts";
@@ -566,6 +567,8 @@ export function buildLid(levelCount: number, pitch: number): LidParts {
   for (const spot of clipSpots) {
     const clip = new Mesh(clipGeometry, brass);
     clip.rotation.z = spot.turn;
+    clip.userData.keep = true; // a pin can be pulled out: it moves on its own
+    clip.add(hitBox(`pin:${spot.k}`, [7, 7, 14], [0, 0, 3])); // a generous click target around the head
     lid.add(named(at(clip, spot.x, spot.y, LID_TOP), `lidClip:${spot.k}`));
   }
 
