@@ -47,6 +47,32 @@ function glowTexture(): CanvasTexture | null {
   return new CanvasTexture(canvas);
 }
 
+/** Light that seeps in from under the lid along the edges of a window: bright at the four edges, clear in the middle (the digit stays readable). */
+function rimTexture(): CanvasTexture | null {
+  if (typeof document === "undefined") return null;
+  const w = 128;
+  const h = 128;
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d")!;
+  ctx.globalCompositeOperation = "lighter";
+  const edge = (x0: number, y0: number, x1: number, y1: number): void => {
+    const g = ctx.createLinearGradient(x0, y0, x1, y1);
+    g.addColorStop(0, "rgba(255,255,255,0.95)");
+    g.addColorStop(0.35, "rgba(255,255,255,0.2)");
+    g.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+  };
+  edge(0, 0, w * 0.4, 0);
+  edge(w, 0, w * 0.6, 0);
+  edge(0, 0, 0, h * 0.4);
+  edge(0, h, 0, h * 0.55); // the lower edge, nearest the user, glows most (the light comes from under the case)
+  edge(0, h, 0, h * 0.55);
+  return new CanvasTexture(canvas);
+}
+
 /** Parts that can be taken off to look inside; the lid also carries the label strip and the back bar. */
 export type CoverName = "lid" | "label" | "bar" | `wall:${WallName}`;
 export const COVER_NAMES: readonly CoverName[] = ["lid", "label", "bar", ...COVER_WALLS.map((w): CoverName => `wall:${w}`)];
@@ -174,9 +200,10 @@ export class Assembly {
     this.hoverGlow = lamp(1.6);
     this.hoverGlow.material.depthTest = false;
     this.machine.add(this.hoverGlow);
+    const rim = rimTexture();
     for (let i = 0; i < n; i++) {
       // a flat additive plane lying in the window opening, just under the lid surface: the lid and the strip hide what is not in the window
-      const glow = new Mesh(new PlaneGeometry(11, 9), new MeshBasicMaterial({ map: glowMap, color: warm.clone().multiplyScalar(2.4), blending: AdditiveBlending, transparent: true, depthWrite: false, toneMapped: false, opacity: 0 }));
+      const glow = new Mesh(new PlaneGeometry(11.6, 12.6), new MeshBasicMaterial({ map: rim, color: warm.clone().multiplyScalar(2.6), blending: AdditiveBlending, transparent: true, depthWrite: false, toneMapped: false, opacity: 0 }));
       glow.position.set(((n - 1) / 2 - i) * params.levelPitch, (WINDOW_Y_FROM + WINDOW_Y_TO) / 2, LID_TOP - 0.45);
       glow.visible = false;
       glow.userData.keep = true; // not merged into the lid: it changes by itself (the merge ignores visibility and baked a permanent plane into the window)
@@ -239,10 +266,8 @@ export class Assembly {
         entry.strength = 1;
       }
       entry.strength = Math.max(0, entry.strength - Math.max(dt, 0) / 0.8);
-      entry.glow.material.opacity = 0.3 * entry.strength * entry.strength;
+      entry.glow.material.opacity = 0.7 * entry.strength * entry.strength;
       entry.glow.visible = entry.strength > 0;
-      // centred on the half of the window the strip leaves open
-      entry.glow.position.y = (WINDOW_Y_FROM + WINDOW_Y_TO) / 2 - 3 * (this.panelOffset / BAR_TRAVEL);
     });
     this.dust.update(dt);
   }
