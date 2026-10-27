@@ -1,4 +1,4 @@
-import { AdditiveBlending, CanvasTexture, Color, Group, Mesh, type Object3D, Sprite, SpriteMaterial, type Vector3 } from "three";
+import { AdditiveBlending, CanvasTexture, Color, Group, Mesh, MeshBasicMaterial, type Object3D, PlaneGeometry, Sprite, SpriteMaterial, type Vector3 } from "three";
 import { createDust } from "./dust";
 import { Mechanism } from "../sim/mechanism";
 import { STEP_DEG } from "../sim/params";
@@ -96,7 +96,7 @@ export class Assembly {
   /** Soft light on the part under the pointer (wheel, gear, pin, strip), and a brief flash in a window when its digit changes. */
   private hoverGlow!: Sprite;
   private hoverWanted = 0;
-  private readonly digitGlows: { sprite: Sprite; last: number; strength: number }[] = [];
+  private readonly digitGlows: { glow: Mesh<PlaneGeometry, MeshBasicMaterial>; last: number; strength: number }[] = [];
   private readonly dust = createDust();
   private standClock = 0;
   private readonly levels: LevelParts[] = [];
@@ -175,11 +175,12 @@ export class Assembly {
     this.hoverGlow.material.depthTest = false;
     this.machine.add(this.hoverGlow);
     for (let i = 0; i < n; i++) {
-      const sprite = lamp(2.2);
-      sprite.scale.set(15, 11, 1);
-      sprite.position.set(((n - 1) / 2 - i) * params.levelPitch, (WINDOW_Y_FROM + WINDOW_Y_TO) / 2, LID_TOP + 0.7);
-      this.lidAssembly.add(sprite);
-      this.digitGlows.push({ sprite, last: -1, strength: 0 });
+      // a flat additive plane lying in the window opening, just under the lid surface: the lid and the strip hide what is not in the window
+      const glow = new Mesh(new PlaneGeometry(11, 9), new MeshBasicMaterial({ map: glowMap, color: warm.clone().multiplyScalar(3.6), blending: AdditiveBlending, transparent: true, depthWrite: false, toneMapped: false, opacity: 0 }));
+      glow.position.set(((n - 1) / 2 - i) * params.levelPitch, (WINDOW_Y_FROM + WINDOW_Y_TO) / 2, LID_TOP - 0.45);
+      glow.visible = false;
+      this.lidAssembly.add(glow);
+      this.digitGlows.push({ glow, last: -1, strength: 0 });
     }
     this.dust.points.visible = typeof location === "undefined" || !new URLSearchParams(location.search).has("still"); // ?still: a steady frame for the comparison shots
     this.root.add(this.dust.points);
@@ -236,8 +237,10 @@ export class Assembly {
         entry.strength = 1;
       }
       entry.strength = Math.max(0, entry.strength - Math.max(dt, 0) / 0.8);
-      entry.sprite.material.opacity = 0.55 * entry.strength * entry.strength;
-      entry.sprite.visible = entry.strength > 0;
+      entry.glow.material.opacity = 0.55 * entry.strength * entry.strength;
+      entry.glow.visible = entry.strength > 0;
+      // centred on the half of the window the strip leaves open
+      entry.glow.position.y = (WINDOW_Y_FROM + WINDOW_Y_TO) / 2 - 3 * (this.panelOffset / BAR_TRAVEL);
     });
     this.dust.update(dt);
   }

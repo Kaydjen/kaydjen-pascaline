@@ -219,7 +219,7 @@ export function createStage(canvas: HTMLCanvasElement, onFatal: (message: string
   controls.minDistance = Math.max(25, content.extent * 0.12);
   controls.maxDistance = 2000;
   controls.maxPolarAngle = MAX_POLAR;
-  controls.mouseButtons = { LEFT: MOUSE.ROTATE, MIDDLE: MOUSE.PAN, RIGHT: MOUSE.ROTATE };
+  controls.mouseButtons = { LEFT: null, MIDDLE: MOUSE.PAN, RIGHT: MOUSE.ROTATE }; // the left button belongs to the stylus, the pins and the strip: only the right one orbits
   controls.update();
 
   const rig = content.views ? createCameraRig(camera, controls, content.views) : null;

@@ -211,14 +211,20 @@ await page.click("text=Subtract");
 check("Subtract shows the descending row", await page.evaluate(() => window.__proto.visibleRow === "descending"));
 await page.click("text=Add");
 check("Add shows the ascending row", await page.evaluate(() => window.__proto.visibleRow === "ascending"));
-// a left drag on the background orbits the camera
+// a left drag on the background leaves the camera alone, a right drag orbits it
 const camBefore = await page.evaluate(() => window.__stage.camera.position.toArray());
 await page.mouse.move(200, 300);
 await page.mouse.down();
 await page.mouse.move(420, 280, { steps: 8 });
 await page.mouse.up();
+const camLeft = await page.evaluate(() => window.__stage.camera.position.toArray());
+check("a left drag on the background does not orbit the camera", camBefore.every((v, i) => Math.abs(v - camLeft[i]) < 0.01));
+await page.mouse.move(200, 300);
+await page.mouse.down({ button: "right" });
+await page.mouse.move(420, 280, { steps: 8 });
+await page.mouse.up({ button: "right" });
 const camAfter = await page.evaluate(() => window.__stage.camera.position.toArray());
-check("a left drag on the background orbits the camera", camBefore.some((v, i) => Math.abs(v - camAfter[i]) > 1));
+check("a right drag on the background orbits the camera", camLeft.some((v, i) => Math.abs(v - camAfter[i]) > 1));
 await page.keyboard.press("3");
 check("key 3 selects 0.05x", (await page.evaluate(() => window.__proto.clock.timeScale)) === 0.05);
 await page.keyboard.press("1");
