@@ -280,6 +280,48 @@ function leverPlate(mat: Material): Group {
   return group;
 }
 
+/** Upright clip (a key-blade of sheet brass): a narrow stem that sinks into a round hole of the lid and a flared head with a shallow notch and a small round eye. Origin at the lid surface. */
+function clipPlate(): BufferGeometry {
+  const shape = new Shape();
+  shape.moveTo(-0.5, -1.6);
+  shape.lineTo(0.5, -1.6);
+  shape.lineTo(0.55, 1.2);
+  shape.lineTo(1.35, 3.4);
+  shape.lineTo(1.2, 5);
+  shape.lineTo(0.15, 4.75);
+  shape.lineTo(-1.2, 5);
+  shape.lineTo(-1.35, 3.4);
+  shape.lineTo(-0.55, 1.2);
+  shape.closePath();
+  const eye = new Path();
+  eye.absarc(0, 3.2, 0.4, 0, Math.PI * 2, true);
+  shape.holes.push(eye);
+  const geometry = new ExtrudeGeometry(shape, { depth: 0.35, bevelEnabled: false });
+  geometry.translate(0, 0, -0.175);
+  geometry.rotateX(Math.PI / 2);
+  return geometry;
+}
+
+/** Round hole (a circle of straight segments). */
+function circleHole(x: number, y: number, radius: number): Path {
+  const hole = new Path();
+  hole.absarc(x, y, radius, 0, Math.PI * 2, true);
+  return hole;
+}
+
+/** Small square stud (a four-sided frustum) with a dark dot on its top. Origin at the plate surface. */
+function squareStud(mat: Material, dotMat: Material, size: number): Group {
+  const stud = new Group();
+  const body = new Mesh(new CylinderGeometry(size * 0.5, size * 0.72, size * 0.55, 4), mat);
+  body.rotation.set(Math.PI / 2, 0, Math.PI / 4);
+  body.position.z = size * 0.275;
+  const dot = new Mesh(new CylinderGeometry(size * 0.16, size * 0.16, 0.05, 8), dotMat);
+  dot.rotation.x = Math.PI / 2;
+  dot.position.z = size * 0.56;
+  stud.add(body, dot);
+  return stud;
+}
+
 /** Slotted round screw head (axis z) lying on a plate: a disc with a dark slot across it. Origin at the plate surface. */
 function slottedScrew(mat: Material, slotMat: Material, radius: number, angle: number): Group {
   const screw = new Group();
@@ -472,6 +514,11 @@ export function buildLid(levelCount: number, pitch: number): LidParts {
   // the sliding strip ends bend down into a slot at each end of its row; the slot is as long as the strip's travel (photos)
   const slotX = halfSpan - 1 - 1.8;
   for (const side of [-1, 1]) plate.holes.push(rectangleHole(side * slotX - SLOT_HALF_WIDTH, STRIP_CENTRE_Y - STRIP_LENGTH / 2 - BAR_TRAVEL, side * slotX + SLOT_HALF_WIDTH, STRIP_CENTRE_Y + STRIP_LENGTH / 2 + BAR_TRAVEL));
+  // four clips stand in round holes near the corners (photos of the whole lid), all on one line 6 mm from the side edges and 4 mm from
+  // the long edges; next to each clip sit two small square studs, one towards the side edge and one along the long edge
+  const clipSpots = ([[0, -1, yFront + 4], [1, 1, yFront + 4], [2, -1, yBack - 4], [3, 1, yBack - 4]] as const).map(([k, side, y]) => ({ k, side, x: side * (lidHalf - 6), y, turn: [0.2, -0.15, 0.1, -0.25][k]! }));
+  for (const spot of clipSpots) plate.holes.push(circleHole(spot.x, spot.y, 1.25));
+  const studSpots = clipSpots.flatMap((spot) => [[spot.x + spot.side * 3.2, spot.y], [spot.x - spot.side * 3.8, spot.y]] as [number, number][]);
   lid.add(named(extrude(plate, LID_THICKNESS, LID_BOTTOM, getMaterial("brass-lid")), "lidPlate"));
 
   // walls of the windows: the chamfer and the straight sides
@@ -484,6 +531,14 @@ export function buildLid(levelCount: number, pitch: number): LidParts {
   // slotted screws at the middle of the front and back edges (the photos show no corner clips)
   for (const [k, y] of [[0, yFront + 3.6], [1, yBack - 3.6]] as const) {
     lid.add(named(at(slottedScrew(brass, dark, 0.8, 0.2 + k), 0, y, LID_TOP), `lidScrew:${k}`));
+  }
+
+  studSpots.forEach(([x, y], i) => lid.add(named(at(squareStud(brass, dark, 1.5), x, y, LID_TOP), `lidStud:${i}`)));
+  const clipGeometry = clipPlate();
+  for (const spot of clipSpots) {
+    const clip = new Mesh(clipGeometry, brass);
+    clip.rotation.z = spot.turn;
+    lid.add(named(at(clip, spot.x, spot.y, LID_TOP), `lidClip:${spot.k}`));
   }
 
   // crown rings (photos): two parts. A thick dark ring stands on the lid; on it lies a thin flat plate that carries the numerals

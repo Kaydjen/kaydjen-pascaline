@@ -15,6 +15,8 @@ const DRUM_PAPER_RADIUS = DIM.drumRadius;
 const DRUM_CORE_RADIUS = DIM.drumRadius - 0.3;
 const DRUM_FLANGE_RADIUS = DIM.drumRadius + 0.15;
 const DRUM_FLANGE_THICKNESS = 0.6;
+/** Digits are drawn larger than DIGIT_HEIGHT: in the photos the figure fills about 60 % of the visible window. */
+const DIGIT_SCALE = 1.3;
 
 /** Position around the drum (0..1, from the top, clockwise seen from the front) where digit d is read. */
 export const drumCentreU = (digit: number): number => digit / 10;
@@ -42,7 +44,7 @@ function digitTexture(level: number): CanvasTexture | null {
     for (let d = 0; d < 10; d++) {
       const x = drumCentreU(d) * canvas.width;
       const shown = String(row === "ascending" ? d : 9 - d);
-      const size = Math.round((DIGIT_HEIGHT / 0.66) * pxPerMm * (1 + jitter(0.06)));
+      const size = Math.round((DIGIT_HEIGHT * DIGIT_SCALE / 0.66) * pxPerMm * (1 + jitter(0.06)));
       ctx.font = `${size}px ${FONT_NUMERAL}`;
       const dx = jitter(0.25) * pxPerMm;
       const dy = pxPerMm * 0.2 + jitter(0.15) * pxPerMm;
@@ -72,7 +74,7 @@ export function buildOutput(level: number): Group {
   const coreMaterial = getMaterial("brass-frame");
   const paperEdgeMaterial = getMaterial("paper-aged");
   // the drum is a metal core with the digit paper wound round it (the paper is only the side; the caps are metal)
-  const paperMaterial = new MeshStandardMaterial({ map: digitTexture(level), color: 0xe8dfcf, metalness: 0, roughness: 0.6 });
+  const paperMaterial = new MeshStandardMaterial({ map: digitTexture(level), color: 0x7a6c50, metalness: 0, roughness: 0.6 });
   const output = tag(at(new Group(), 0, DIM.y.gear50, OUTPUT_SHAFT_Z), `output:${level}`);
   output.name = `output:${level}`;
   output.add(new Mesh(toothWheelGeometry(), brass));

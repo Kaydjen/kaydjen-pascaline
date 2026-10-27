@@ -540,11 +540,15 @@ if (uLines > 0.0) {
   // two grooves 2.0 and 2.6 mm inside the border of the plate (the same centre and half size as the rim)
   vec2 lq = uVigH - abs(vWearPos.xy - uVigC);
   float edgeDist = min(lq.x, lq.y);
-  float lineHalf = max(0.1, wearPx * 0.9);
-  float tent = max(max(1.0 - abs(edgeDist - 2.0) / lineHalf, 0.0), max(1.0 - abs(edgeDist - 2.6) / lineHalf, 0.0));
-  float lineFade = 0.1 / lineHalf; // a hairline wider than a pixel at a distance would turn into a smear: its strength falls with the pixel size
-  wearLine = tent * clamp(lineFade, 0.0, 1.0) * (0.75 + 0.5 * wNoise(vWearPos * 1.3)) * uLines;
-  diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.16, 0.13, 0.1), clamp(smoothstep(0.0, 0.7, tent) * clamp(lineFade, 0.0, 1.0) * uLines, 0.0, 0.9));
+  // far = the grooves are thinner than a pixel: one soft, wider line without relief and without noise (a hairline there crawls
+  // and turns into a dotted zip when the camera moves)
+  float lineFar = smoothstep(0.04, 0.12, wearPx);
+  float lineHalf = max(0.1, wearPx * mix(0.9, 1.6, lineFar));
+  float tent = max(1.0 - abs(edgeDist - 2.3) / lineHalf, 0.0) * lineFar + (1.0 - lineFar) * max(max(1.0 - abs(edgeDist - 2.0) / lineHalf, 0.0), max(1.0 - abs(edgeDist - 2.6) / lineHalf, 0.0));
+  float lineNoise = mix(0.75 + 0.5 * wNoise(vWearPos * 1.3), 1.0, lineFar);
+  wearLine = tent * (1.0 - lineFar) * lineNoise * uLines;
+  float lineInk = clamp(smoothstep(0.0, 0.7, tent) * mix(1.0, 0.45, lineFar) * uLines, 0.0, 0.9);
+  diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.16, 0.13, 0.1), lineInk);
 }
 #endif
 #ifdef W_CURV
@@ -632,7 +636,7 @@ export function installWear(material: MeshStandardMaterial, settings: WearSettin
   const uniforms = uniformsFor(settings);
   if (faceSize) (uniforms.uFaceSize!.value as Vector2).set(faceSize[0], faceSize[1]);
   material.userData.wear = uniforms;
-  material.customProgramCacheKey = () => `wear-23:${list.join(",")}`;
+  material.customProgramCacheKey = () => `wear-25:${list.join(",")}`;
   material.onBeforeCompile = (shader: WebGLProgramParametersWithUniforms) => {
     Object.assign(shader.uniforms, uniforms);
     shader.vertexShader = shader.vertexShader.replace("#include <common>", VERTEX_DECLARATIONS).replace("#include <begin_vertex>", "#include <begin_vertex>\nvWearPos = transformed;\nvWearN = objectNormal;\nvWearUv = uv;");
