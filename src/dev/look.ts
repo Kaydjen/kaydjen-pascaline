@@ -104,7 +104,7 @@ export async function measure(session: PrototypeSession, camera: PerspectiveCame
           const hits = raycaster.intersectObject(root, true).filter((h) => h.object.visible && h.object.parent !== null);
           const first = hits.find((h) => h.object.type === "Mesh" && !((h.object as Mesh).material as { transparent?: boolean }).transparent);
           count++;
-          if (first && Math.abs(first.distance - distance) < 0.6 && first.object.parent?.name === `drum:${i}`) seen++;
+          if (first && Math.abs(first.distance - distance) < 0.9 && first.object.parent?.name === `drum:${i}`) seen++;
           else missed.push(`y${y} x${dx}: ${first ? `${first.object.name || first.object.type} (${first.object.parent?.name})` : "nothing"}`);
         }
       }

@@ -138,6 +138,6 @@ const worst = Math.min(...report.digitVisibility.map((d) => d.seen));
 console.log(`screenshots: ${out}`);
 console.log(`floor coverage ${(report.floorCoverage * 100).toFixed(0)}%, largest empty strip: y ${report.largestGapY} mm, x ${report.largestGapX} mm`);
 console.log(`digit visibility from the default camera: worst ${(worst * 100).toFixed(0)}%`);
-for (const d of report.digitVisibility) if (d.seen < 0.9) console.log(`  level ${d.level} ${d.row}: ${(d.seen * 100).toFixed(0)}%${d.level === 0 ? "  missed: " + d.missed.join("; ") : ""}`);
+for (const d of report.digitVisibility) if (d.seen < 0.9) console.log(`  level ${d.level} ${d.row}: ${(d.seen * 100).toFixed(0)}%${"  missed: " + d.missed.join("; ")}`);
 if (errors.length) console.log("console errors:\n" + errors.join("\n"));
 process.exit(errors.length ? 1 : 0);

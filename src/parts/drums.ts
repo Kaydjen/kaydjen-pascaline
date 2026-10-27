@@ -18,7 +18,7 @@ const DRUM_FLANGE_THICKNESS = 0.6;
 /** Digits are drawn larger than DIGIT_HEIGHT: in the photos the figure fills about 60 % of the visible window. */
 const DIGIT_SCALE = 1.3;
 
-/** Paper wound by hand is not a perfect cylinder: the radius wobbles a little round the drum and along it (at most 0.12 mm, under the flange rims). */
+/** Paper wound by hand is not a perfect cylinder: the radius wobbles a little round the drum and along it (inwards by at most 0.12 mm, under the flange rims). */
 const PAPER_WAVE = 0.12;
 function wavyPaper(geometry: CylinderGeometry, level: number): void {
   const random = seededRandom(7000 + level);
@@ -30,7 +30,7 @@ function wavyPaper(geometry: CylinderGeometry, level: number): void {
     const y = position.getY(i);
     const angle = Math.atan2(z, x);
     const wobble = 0.5 * Math.sin(2 * angle + phase[0]!) + 0.35 * Math.sin(5 * angle + phase[1]! + y * 0.08) + 0.25 * Math.sin(3 * angle + phase[2]! - y * 0.15);
-    const k = (DRUM_PAPER_RADIUS + PAPER_WAVE * wobble) / DRUM_PAPER_RADIUS;
+    const k = (DRUM_PAPER_RADIUS - (PAPER_WAVE * (wobble + 1.1)) / 2.2) / DRUM_PAPER_RADIUS; // only inwards: the nominal radius stays the outer limit
     position.setXYZ(i, x * k, y, z * k);
   }
   geometry.computeVertexNormals();
