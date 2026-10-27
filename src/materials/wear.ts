@@ -104,7 +104,7 @@ export const CLEAN: WearSettings = {
   patinaColor: "#4b5a3a",
 };
 
-export const NO_SCAN: ScanSettings = { scan: "", stain: 1, tile: 60, tint: "#ffffff", normal: 1, roughMul: 1, roughAdd: 0, wood: false, edge: 0, edgeWidth: 1.2, edgeColor: "#c9a95a", wave: 0, waveSize: 60, low: 0, lowZ: -35.9, lowH: 20, corner: 0, cornerWidth: 8, scan2: "", tile2: 50, tint2: "#ffffff", amount2: 0, bottom2: 0.7, streak2: 0.7, streakLen2: 30, spots2: 0.3, vig: 0, vigX: 0, vigY: 7, vigHX: 127.3, vigHY: 51.8, offX: 0, offY: 0, halo: 0, zones: 0, rim: 0, lines: 0, curv: 0 };
+export const NO_SCAN: ScanSettings = { scan: "", stain: 1, tile: 60, tint: "#ffffff", normal: 1, roughMul: 1, roughAdd: 0, wood: false, edge: 0, edgeWidth: 1.2, edgeColor: "#c9a95a", wave: 0, waveSize: 60, low: 0, lowZ: -35.9, lowH: 20, corner: 0, cornerWidth: 8, scan2: "", tile2: 50, tint2: "#ffffff", amount2: 0, bottom2: 0.7, streak2: 0.7, streakLen2: 30, spots2: 0.3, vig: 0, vigX: 0, vigY: 7, vigHX: 127, vigHY: 51.5, offX: 0, offY: 0, halo: 0, zones: 0, rim: 0, lines: 0, curv: 0 };
 
 export type WearLevel = "none" | "light" | "medium" | "heavy";
 
