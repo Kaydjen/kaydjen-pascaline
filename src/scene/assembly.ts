@@ -176,9 +176,11 @@ export class Assembly {
     this.machine.add(this.hoverGlow);
     for (let i = 0; i < n; i++) {
       // a flat additive plane lying in the window opening, just under the lid surface: the lid and the strip hide what is not in the window
-      const glow = new Mesh(new PlaneGeometry(11, 9), new MeshBasicMaterial({ map: glowMap, color: warm.clone().multiplyScalar(3.6), blending: AdditiveBlending, transparent: true, depthWrite: false, toneMapped: false, opacity: 0 }));
+      const glow = new Mesh(new PlaneGeometry(11, 9), new MeshBasicMaterial({ map: glowMap, color: warm.clone().multiplyScalar(2.4), blending: AdditiveBlending, transparent: true, depthWrite: false, toneMapped: false, opacity: 0 }));
       glow.position.set(((n - 1) / 2 - i) * params.levelPitch, (WINDOW_Y_FROM + WINDOW_Y_TO) / 2, LID_TOP - 0.45);
       glow.visible = false;
+      glow.userData.keep = true; // not merged into the lid: it changes by itself (the merge ignores visibility and baked a permanent plane into the window)
+      glow.userData.noAo = true; // light, not a surface
       this.lidAssembly.add(glow);
       this.digitGlows.push({ glow, last: -1, strength: 0 });
     }
@@ -237,7 +239,7 @@ export class Assembly {
         entry.strength = 1;
       }
       entry.strength = Math.max(0, entry.strength - Math.max(dt, 0) / 0.8);
-      entry.glow.material.opacity = 0.55 * entry.strength * entry.strength;
+      entry.glow.material.opacity = 0.3 * entry.strength * entry.strength;
       entry.glow.visible = entry.strength > 0;
       // centred on the half of the window the strip leaves open
       entry.glow.position.y = (WINDOW_Y_FROM + WINDOW_Y_TO) / 2 - 3 * (this.panelOffset / BAR_TRAVEL);

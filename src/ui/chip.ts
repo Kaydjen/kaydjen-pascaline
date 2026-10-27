@@ -7,7 +7,7 @@ import { el } from "./dom";
 export const LABEL_TRANSLATIONS = ["units", "tens", "hundreds", "thousands", "tens of thousands", "hundreds of thousands"] as const;
 
 const DELAY = 0.35;
-const NAMES_KEY = "pascaline.names";
+const NAMES_KEY = "pascaline.names.v2"; // v2: the first version defaulted to on and remembered it; the new default is off
 
 /** The Names switch: captions over the part under the pointer. Off until the visitor turns it on (remembered). */
 export class NamesSwitch {

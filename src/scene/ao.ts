@@ -81,14 +81,14 @@ export function installAo(debug: StageDebug, settings: AoSettings, target: WebGL
     blend.uniforms.intensity!.value = gtao.blendIntensity;
     render(r, writeBuffer, readBuffer, delta, mask);
   };
-  // the glow sprites (stand, contact lamps, hover, windows) are light, not surfaces: left in the occlusion pass they were drawn as flat quads
+  // the glow sprites and planes (stand, contact lamps, hover, windows) are light, not surfaces: left in the occlusion pass they were drawn as flat quads
   // and cleared the occlusion in a square around them (the pass already leaves out points and lines the same way)
   const hooks = gtao as unknown as { _overrideVisibility(): void; _visibilityCache: Object3D[] };
   const hideLines = hooks._overrideVisibility.bind(gtao);
   hooks._overrideVisibility = () => {
     hideLines();
     scene.traverse((o) => {
-      if ((o as Sprite).isSprite && o.visible) {
+      if (((o as Sprite).isSprite || o.userData.noAo === true) && o.visible) {
         o.visible = false;
         hooks._visibilityCache.push(o);
       }
