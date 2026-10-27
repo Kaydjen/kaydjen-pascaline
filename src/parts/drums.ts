@@ -18,6 +18,24 @@ const DRUM_FLANGE_THICKNESS = 0.6;
 /** Digits are drawn larger than DIGIT_HEIGHT: in the photos the figure fills about 60 % of the visible window. */
 const DIGIT_SCALE = 1.3;
 
+/** Paper wound by hand is not a perfect cylinder: the radius wobbles a little round the drum and along it (at most 0.12 mm, under the flange rims). */
+const PAPER_WAVE = 0.12;
+function wavyPaper(geometry: CylinderGeometry, level: number): void {
+  const random = seededRandom(7000 + level);
+  const phase = [random() * 6.28, random() * 6.28, random() * 6.28];
+  const position = geometry.getAttribute("position");
+  for (let i = 0; i < position.count; i++) {
+    const x = position.getX(i);
+    const z = position.getZ(i);
+    const y = position.getY(i);
+    const angle = Math.atan2(z, x);
+    const wobble = 0.5 * Math.sin(2 * angle + phase[0]!) + 0.35 * Math.sin(5 * angle + phase[1]! + y * 0.08) + 0.25 * Math.sin(3 * angle + phase[2]! - y * 0.15);
+    const k = (DRUM_PAPER_RADIUS + PAPER_WAVE * wobble) / DRUM_PAPER_RADIUS;
+    position.setXYZ(i, x * k, y, z * k);
+  }
+  geometry.computeVertexNormals();
+}
+
 /** Position around the drum (0..1, from the top, clockwise seen from the front) where digit d is read. */
 export const drumCentreU = (digit: number): number => digit / 10;
 
@@ -81,7 +99,9 @@ export function buildOutput(level: number): Group {
   output.add(at(shaft(1.2, OUTPUT_SHAFT_LENGTH, "y", steel), 0, OUTPUT_SHAFT_CENTRE, 0));
   const drum = at(new Group(), 0, 2 + DIM.drumLength / 2 + 1, 0);
   drum.name = `drum:${level}`;
-  const paper = new Mesh(new CylinderGeometry(DRUM_PAPER_RADIUS, DRUM_PAPER_RADIUS, DIM.drumLength, 96, 1, true), paperMaterial);
+  const paperGeometry = new CylinderGeometry(DRUM_PAPER_RADIUS, DRUM_PAPER_RADIUS, DIM.drumLength, 96, 8, true);
+  wavyPaper(paperGeometry, level);
+  const paper = new Mesh(paperGeometry, paperMaterial);
   paper.userData.keep = true; // textured per drum: stays a mesh of its own (the look checks read it)
   drum.add(paper, cylinder(DRUM_CORE_RADIUS, DIM.drumLength, "y", coreMaterial, 64));
   for (const side of [-1, 1]) {

@@ -94,3 +94,14 @@ export const crownAngleDeg = (digit: number): number => 180 - digit * STEP_DEG;
 export const COVER_WALLS = ["front", "back", "left", "right"] as const;
 export type WallName = (typeof COVER_WALLS)[number];
 
+
+/** Top of the frame end plates; the flat ears of the frame lie just under it. */
+export const FRAME_TOP = 43.5;
+/** The frame ears (flat tabs, one hole each) and the locating pins of the lid that drop into them: y of the front and back pair. */
+export const EAR_YS = [-33, 49.5] as const;
+/** The hole of an ear is this far inside the outer face of the end plate (the frame is `levelCount * pitch` wide between the plates). */
+export const EAR_HOLE_FROM_PLATE = 4.2;
+/** x of an ear hole and of the lid pin above it (`side` is -1 or 1); the outer face of the plate is 1.3 mm outside the frame span. */
+export const earX = (levelCount: number, pitch: number, side: -1 | 1): number => side * ((levelCount * pitch) / 2 + 1.3 - EAR_HOLE_FROM_PLATE);
+/** How far the tip of a lid pin reaches down: through the lid to just under the top of the ear. */
+export const PIN_TIP_Z = FRAME_TOP - 0.6;

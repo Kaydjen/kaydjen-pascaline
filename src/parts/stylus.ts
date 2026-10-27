@@ -3,7 +3,7 @@ import { Group, LatheGeometry, Mesh, Vector2 } from "three";
 /** The one accent colour of the interface (verdigris). */
 export const ACCENT = 0x5fb3a1;
 import { getMaterial } from "../materials/factory";
-import { STRIP_CENTRE_Y, STRIP_LENGTH, STRIP_THICKNESS, BARREL_LENGTH, BARREL_OUTER, LID_TOP } from "./case";
+import { STRIP_CENTRE_Y, BARREL_LENGTH, BARREL_OUTER, LID_TOP } from "./case";
 import { at, named } from "./common";
 import { hitCylinder } from "./proxies";
 
@@ -42,11 +42,11 @@ export function buildStylus(): Group {
 /** Where the stylus rests: tip deep in the right barrel, the knob out of its open end, lying along y (z of the barrel axis). */
 export function stylusParkedPose(halfSpan: number): { x: number; y: number; z: number; yaw: number } {
   const stripWidth = 2 * (halfSpan - 1);
-  const barrelFrontY = STRIP_CENTRE_Y + STRIP_LENGTH / 2 - BARREL_LENGTH;
+  const barrelFrontY = STRIP_CENTRE_Y - BARREL_LENGTH / 2;
   return {
     x: stripWidth / 2 - BARREL_OUTER - 0.5,
     y: barrelFrontY + BARREL_LENGTH - 0.6,
-    z: LID_TOP + STRIP_THICKNESS + BARREL_OUTER,
+    z: LID_TOP + BARREL_OUTER,
     yaw: Math.PI, // local +y (knob) points to -y, towards the wheels
   };
 }

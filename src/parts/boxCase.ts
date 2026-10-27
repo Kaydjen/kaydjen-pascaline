@@ -121,8 +121,8 @@ export function buildBox(levelCount: number, pitch: number): BoxParts {
 
   // ledge strips along the front and back walls (the side walls are too close to the strip legs and the bars)
   const ledgeZ = LID_BOTTOM - 0.2 - LEDGE_HEIGHT / 2;
-  walls.front.add(named(part(2 * (innerX - 1.5), LEDGE_WIDTH, LEDGE_HEIGHT, 0, WALL / 2 + LEDGE_WIDTH / 2, ledgeZ - wallZ, rawMaterial), "ledge:front"));
-  walls.back.add(named(part(2 * (innerX - 1.5), LEDGE_WIDTH, LEDGE_HEIGHT, 0, -WALL / 2 - LEDGE_WIDTH / 2, ledgeZ - wallZ, rawMaterial), "ledge:back"));
+  walls.front.add(named(part(2 * (innerX - 9.5), LEDGE_WIDTH, LEDGE_HEIGHT, 0, WALL / 2 + LEDGE_WIDTH / 2, ledgeZ - wallZ, rawMaterial), "ledge:front"));
+  walls.back.add(named(part(2 * (innerX - 9.5), LEDGE_WIDTH, LEDGE_HEIGHT, 0, -WALL / 2 - LEDGE_WIDTH / 2, ledgeZ - wallZ, rawMaterial), "ledge:back"));
 
   // a wooden rim round the top of the walls, just under the lid, like the plank under the box (rounded edges, same wood); brass pins hold it
   const rimHalf = outerHalf + RIM_OUT;

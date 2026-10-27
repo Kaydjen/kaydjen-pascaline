@@ -2,7 +2,7 @@ import { BufferGeometry, ExtrudeGeometry, Group, InstancedMesh, Matrix4, Mesh, P
 import { getMaterial } from "../materials/factory";
 import type { MechanismParams } from "../sim/params";
 import { at, BAR, box, named, tag } from "./common";
-import { CASE_Y_BACK, CASE_Y_FRONT, FLOOR_TOP, LID_BOTTOM } from "./case";
+import { CASE_Y_BACK, CASE_Y_FRONT, EAR_HOLE_FROM_PLATE, EAR_YS, FLOOR_TOP, FRAME_TOP, LID_BOTTOM } from "./case";
 import { DIM, INPUT_GEAR_Z, INPUT_SHAFT_Y, OUTPUT_SHAFT_Z } from "./dimensions";
 import { LEVER_BOTTOM_Y, RAIL_Z } from "./carry";
 import { addBoxProxy } from "./proxies";
@@ -10,7 +10,6 @@ import { OUTPUT_SHAFT_CENTRE, OUTPUT_SHAFT_LENGTH } from "./drums";
 import { INPUT_SHAFT_BOTTOM } from "./wheelGroup";
 
 const FRAME_PLATE_THICKNESS = 1.2;
-const FRAME_TOP = 43.5;
 /** The partition stays below the under-lid bearing bar (its underside is at z = 42.4). */
 const PARTITION_TOP = 42;
 /** The partition is 1 mm short of the ledge strips at the front and back wall. */
@@ -76,7 +75,7 @@ function frameArcade(levelCount: number, pitch: number, topZ: number): BufferGeo
   return geometry;
 }
 
-/** Flange of an end plate: a flat tab that would be screwed to the lid underside (user-frame-front-sothebys.png: ears with holes). Built in (x, y), extruded along z. */
+/** Flange of an end plate: a flat tab with a hole that takes a locating pin of the lid (user-frame-front-sothebys.png: ears with holes). Built in (x, y), extruded along z. */
 function earGeometry(): BufferGeometry {
   const shape = new Shape();
   shape.moveTo(0, -3);
@@ -87,7 +86,7 @@ function earGeometry(): BufferGeometry {
   shape.lineTo(0, 3);
   shape.closePath();
   const hole = new Path();
-  hole.absarc(EAR_LENGTH - 3, 0, 1.1, 0, Math.PI * 2, true);
+  hole.absarc(EAR_HOLE_FROM_PLATE, 0, 1.1, 0, Math.PI * 2, true);
   shape.holes.push(hole);
   return new ExtrudeGeometry(shape, { depth: EAR_THICKNESS, bevelEnabled: false, curveSegments: 12 });
 }
@@ -165,7 +164,7 @@ export function buildFrame(params: MechanismParams): Group {
   // brass end plates of the frame (museum photos): a plate with rounded openings at each end of the support bars,
   // so that the mechanism reads as one frame standing in the case
   const plateGeometry = frameEndPlate();
-  for (const side of [-1, 1]) {
+  for (const side of [-1, 1] as const) {
     const plate = tag(new Mesh(plateGeometry, getMaterial("brass-brushed")), "fixed");
     plate.name = side < 0 ? "framePlate:left" : "framePlate:right";
     plate.position.x = side * (halfSpan + 0.1) + (side > 0 ? 0 : -FRAME_PLATE_THICKNESS);
@@ -202,8 +201,6 @@ export function buildFrame(params: MechanismParams): Group {
   frame.add(rivetRow(rivetX, -7 - BAR - 0.05, -1, 0), rivetRow(rivetX, 33 + BAR + 0.05, 1, 0));
   return frame;
 }
-
-const EAR_YS = [-30, 38] as const;
 
 /** Bearing bar under the lid for the upper pins of the input shafts; part of the lid assembly (it lifts with the shafts). */
 export function buildUnderLidBar(params: MechanismParams): Mesh {

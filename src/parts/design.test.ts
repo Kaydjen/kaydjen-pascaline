@@ -100,7 +100,7 @@ describe("design rules from the photos", () => {
     expect(topNear - topFar).toBeGreaterThan(0.25); // the tip sits lower than the hub end
   });
 
-  it("lid (bw-front-view.png, strip-barrels-crop.png): four upright corner clips, screws at the edge middles, border line 2-3 mm inside the edge", () => {
+  it("lid (bw-front-view.png, strip-barrels-crop.png): four locating pins, screws at the edge middles, border line 2-3 mm inside the edge", () => {
     for (let k = 0; k < 4; k++) expect(findObject(`lidClip:${k}`)).toBeDefined();
     expect(findObject("lidScrew:0")).toBeDefined();
     // the border lines are engraved by the lid material measured from the plate outline the shader is told about (`vigX/vigY/vigHX/vigHY`)

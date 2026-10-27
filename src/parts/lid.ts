@@ -26,7 +26,6 @@ import { STEP_DEG } from "../sim/params";
 import { at, forgedBox, named } from "./common";
 import {
   BAR_TRAVEL,
-  BARREL_INNER,
   BARREL_LENGTH,
   BARREL_OUTER,
   CASE_Y_BACK,
@@ -40,7 +39,10 @@ import {
   LABEL_Y_TO,
   LABELS,
   LID_BOTTOM,
+  EAR_YS,
+  earX,
   LID_OVERHANG,
+  PIN_TIP_Z,
   LID_THICKNESS,
   LID_TOP,
   numeralRotation,
@@ -243,12 +245,38 @@ function rectangleHole(x0: number, y0: number, x1: number, y1: number): Path {
   return hole;
 }
 
-function annulus(inner: number, outer: number): Shape {
+/**
+ * End of the sliding strip: the thin sheet runs on past the strip, curls up and rolls into a scroll of about one and a half turns
+ * (photos: the "barrels" are the rolled ends of the strip, not separate tubes). Built for the +x end in (x, z) (`mirror` -1 for the -x end), extruded along y;
+ * the axis of the scroll sits `outer` above the strip surface.
+ */
+function scrollProfile(outer: number, sheet: number, mirror: 1 | -1): Shape {
+  const radius = outer - sheet / 2; // radius of the centre line
+  const turns = 0.9; // a little less than one wrap: a thin sheet is not rolled tighter by hand
+  const pitch = (sheet * 0.5) / (2 * Math.PI); // radius lost per radian: the coil closes in slightly
+  const centre: [number, number][] = [[0, sheet / 2 - outer]];
+  const steps = 72;
+  for (let i = 0; i <= steps; i++) {
+    const phi = (i / steps) * turns * 2 * Math.PI;
+    const r = radius - pitch * phi;
+    centre.push([r * Math.sin(phi), -r * Math.cos(phi)]); // starts at the bottom, runs outwards (+x), up and over
+  }
+  const left: [number, number][] = [];
+  const right: [number, number][] = [];
+  centre.forEach(([x, z], i) => {
+    const [x0, z0] = centre[Math.max(i - 1, 0)]!;
+    const [x1, z1] = centre[Math.min(i + 1, centre.length - 1)]!;
+    const length = Math.hypot(x1 - x0, z1 - z0) || 1;
+    const nx = -(z1 - z0) / length;
+    const nz = (x1 - x0) / length;
+    left.push([mirror * (x + (nx * sheet) / 2), z + (nz * sheet) / 2]);
+    right.push([mirror * (x - (nx * sheet) / 2), z - (nz * sheet) / 2]);
+  });
   const shape = new Shape();
-  shape.absarc(0, 0, outer, 0, Math.PI * 2, false);
-  const hole = new Path();
-  hole.absarc(0, 0, inner, 0, Math.PI * 2, true);
-  shape.holes.push(hole);
+  shape.moveTo(...left[0]!);
+  for (const point of left.slice(1)) shape.lineTo(...point);
+  for (const point of right.reverse()) shape.lineTo(...point);
+  shape.closePath();
   return shape;
 }
 
@@ -280,11 +308,11 @@ function leverPlate(mat: Material): Group {
   return group;
 }
 
-/** Upright clip (a key-blade of sheet brass): a narrow stem that sinks into a round hole of the lid and a flared head with a shallow notch and a small round eye. Origin at the lid surface. */
-function clipPlate(): BufferGeometry {
+/** Upright locating pin (a key-blade of sheet brass) of the lid: a narrow stem that passes a round hole of the lid and reaches `drop` mm below its top into the hole of a frame ear, and a flared head with a shallow notch and a small round eye. Origin at the lid surface. */
+function clipPlate(drop: number): BufferGeometry {
   const shape = new Shape();
-  shape.moveTo(-0.5, -1.6);
-  shape.lineTo(0.5, -1.6);
+  shape.moveTo(-0.5, -drop);
+  shape.lineTo(0.5, -drop);
   shape.lineTo(0.55, 1.2);
   shape.lineTo(1.35, 3.4);
   shape.lineTo(1.2, 5);
@@ -512,11 +540,11 @@ export function buildLid(levelCount: number, pitch: number): LidParts {
   const plate = rectangle(-lidHalf, yFront, lidHalf, yBack);
   for (let i = 0; i < levelCount; i++) plate.holes.push(rectangleHole(levelX(i) - WINDOW_HALF_WIDTH - WINDOW_CHAMFER, WINDOW_Y_FROM - WINDOW_FRONT_SLOPE, levelX(i) + WINDOW_HALF_WIDTH + WINDOW_CHAMFER, WINDOW_Y_TO + WINDOW_CHAMFER));
   // the sliding strip ends bend down into a slot at each end of its row; the slot is as long as the strip's travel (photos)
-  const slotX = halfSpan - 1 - 1.8;
+  const slotX = halfSpan - 1 - BARREL_OUTER - 0.5 - 1.4; // under the strip, just inside the rolled end
   for (const side of [-1, 1]) plate.holes.push(rectangleHole(side * slotX - SLOT_HALF_WIDTH, STRIP_CENTRE_Y - STRIP_LENGTH / 2 - BAR_TRAVEL, side * slotX + SLOT_HALF_WIDTH, STRIP_CENTRE_Y + STRIP_LENGTH / 2 + BAR_TRAVEL));
   // four clips stand in round holes near the corners (photos of the whole lid), all on one line 6 mm from the side edges and 4 mm from
   // the long edges; next to each clip sit two small square studs, one towards the side edge and one along the long edge
-  const clipSpots = ([[0, -1, yFront + 4], [1, 1, yFront + 4], [2, -1, yBack - 4], [3, 1, yBack - 4]] as const).map(([k, side, y]) => ({ k, side, x: side * (lidHalf - 6), y, turn: [0.2, -0.15, 0.1, -0.25][k]! }));
+  const clipSpots = ([-1, 1] as const).flatMap((side) => EAR_YS.map((y, j) => ({ side, x: earX(levelCount, pitch, side), y, turn: [0.2, -0.15, 0.1, -0.25][(side < 0 ? 0 : 1) + 2 * j]!, k: (side < 0 ? 0 : 1) + 2 * j })));
   for (const spot of clipSpots) plate.holes.push(circleHole(spot.x, spot.y, 1.25));
   const studSpots = clipSpots.flatMap((spot) => [[spot.x + spot.side * 3.2, spot.y], [spot.x - spot.side * 3.8, spot.y]] as [number, number][]);
   lid.add(named(extrude(plate, LID_THICKNESS, LID_BOTTOM, getMaterial("brass-lid")), "lidPlate"));
@@ -534,7 +562,7 @@ export function buildLid(levelCount: number, pitch: number): LidParts {
   }
 
   studSpots.forEach(([x, y], i) => lid.add(named(at(squareStud(brass, dark, 1.5), x, y, LID_TOP), `lidStud:${i}`)));
-  const clipGeometry = clipPlate();
+  const clipGeometry = clipPlate(LID_TOP - PIN_TIP_Z);
   for (const spot of clipSpots) {
     const clip = new Mesh(clipGeometry, brass);
     clip.rotation.z = spot.turn;
@@ -672,10 +700,13 @@ export function buildLid(levelCount: number, pitch: number): LidParts {
   slider.userData.body = "fixed";
   const stripWidth = 2 * (halfSpan - 1);
   const stripTop = LID_TOP + STRIP_THICKNESS;
-  slider.add(named(at(forgedBox(stripWidth, STRIP_LENGTH, STRIP_THICKNESS, stripBrass, 0.18), 0, STRIP_CENTRE_Y, LID_TOP + STRIP_THICKNESS / 2), "bar"));
+  // the flat part of the strip ends where the rolled end begins: the same sheet runs on into the scroll
+  const scrollX = stripWidth / 2 - BARREL_OUTER - 0.5;
+  const plateWidth = 2 * scrollX;
+  slider.add(named(at(forgedBox(plateWidth, STRIP_LENGTH, STRIP_THICKNESS, stripBrass, 0.18), 0, STRIP_CENTRE_Y, LID_TOP + STRIP_THICKNESS / 2), "bar"));
   // the user-side edge is bent over: a bright rounded bead along it (strip-barrels-crop.png)
   const lipRadius = 0.28;
-  const lipGeometry = new CylinderGeometry(lipRadius, lipRadius, stripWidth - 0.4, 16);
+  const lipGeometry = new CylinderGeometry(lipRadius, lipRadius, plateWidth - 0.4, 16);
   lipGeometry.rotateZ(Math.PI / 2);
   slider.add(named(at(new Mesh(lipGeometry, stripBrass), 0, STRIP_CENTRE_Y + STRIP_LENGTH / 2 - 0.1, stripTop - 0.1), "stripLip"));
   // a leg bends down from each end of the strip into its slot
@@ -684,17 +715,18 @@ export function buildLid(levelCount: number, pitch: number): LidParts {
   stripRivet.scale(1, 0.55, 1);
   stripRivet.rotateX(Math.PI / 2);
   for (const side of [-1, 1]) {
-    slider.add(named(at(new Mesh(stripRivet, stripBrass), side * (stripWidth / 2 - 2 * BARREL_OUTER - 1.6), STRIP_CENTRE_Y + STRIP_LENGTH / 2 - 2.6, stripTop), `stripScrew:${side < 0 ? "left" : "right"}`));
+    slider.add(named(at(new Mesh(stripRivet, stripBrass), side * (scrollX - BARREL_OUTER - 1.1), STRIP_CENTRE_Y + STRIP_LENGTH / 2 - 2.6, stripTop), `stripScrew:${side < 0 ? "left" : "right"}`));
   }
   for (const side of [-1, 1]) {
-    slider.add(named(at(forgedBox(2 * SLOT_HALF_WIDTH - 0.5, STRIP_LENGTH - 1, STRIP_LEG_LENGTH, stripBrass, 0.2), side * (stripWidth / 2 - 1.8), STRIP_CENTRE_Y, LID_TOP - STRIP_LEG_LENGTH / 2 + STRIP_THICKNESS), `stripLeg:${side < 0 ? "left" : "right"}`));
+    slider.add(named(at(forgedBox(2 * SLOT_HALF_WIDTH - 0.5, STRIP_LENGTH - 1, STRIP_LEG_LENGTH, stripBrass, 0.2), side * (scrollX - 1.4), STRIP_CENTRE_Y, LID_TOP - STRIP_LEG_LENGTH / 2 + STRIP_THICKNESS), `stripLeg:${side < 0 ? "left" : "right"}`));
   }
-  const barrelGeometry = new ExtrudeGeometry(annulus(BARREL_INNER, BARREL_OUTER), { depth: BARREL_LENGTH, bevelEnabled: false, curveSegments: 24 });
-  barrelGeometry.rotateX(-Math.PI / 2); // axis along +y: from the open end facing the wheels towards the back
-  const barrelFrontY = STRIP_CENTRE_Y + STRIP_LENGTH / 2 - BARREL_LENGTH;
+  // the rolled ends of the strip (barrels): one thin sheet each, curled into a scroll with its axis along y
+  // the rolled ends: the sheet of the strip itself, narrower than the strip (it sits in the middle of its width), curled up into a scroll
   for (const [side, name] of [[-1, "barrel:left"], [1, "barrel:right"]] as const) {
     // the position is baked into the geometry: the wear zones are given in machine coordinates
-    const placed = barrelGeometry.clone().translate(side * (stripWidth / 2 - BARREL_OUTER - 0.5), barrelFrontY, stripTop + BARREL_OUTER);
+    const placed = new ExtrudeGeometry(scrollProfile(BARREL_OUTER, STRIP_THICKNESS, side), { depth: BARREL_LENGTH, bevelEnabled: false });
+    placed.rotateX(Math.PI / 2); // shape y becomes z, the extrusion runs along -y
+    placed.translate(side * scrollX, STRIP_CENTRE_Y + BARREL_LENGTH / 2, LID_TOP + BARREL_OUTER);
     slider.add(named(new Mesh(placed, stripBrass), name));
   }
 
