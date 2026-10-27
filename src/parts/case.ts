@@ -9,8 +9,11 @@ import { STEP_DEG } from "../sim/params";
 export const LID_TOP = 46.8;
 export const LID_THICKNESS = 1.2;
 export const LID_BOTTOM = LID_TOP - LID_THICKNESS;
-/** The lid overhangs the walls on every side. */
-export const LID_OVERHANG = 1.5;
+/** Dark wooden rim round the top of the walls under the lid: how far it stands out of the wall and how tall it is. */
+export const RIM_OUT = 1.8;
+export const RIM_HEIGHT = 4.5;
+/** The lid overhangs the walls on every side, and the rim by 1 mm. */
+export const LID_OVERHANG = RIM_OUT + 1;
 
 /** The museum case is 128 mm deep but the mechanism fills only about 100 mm: the case is sized to the mechanism so that there is no empty space. */
 export const CASE_Y_FRONT = -42;

@@ -1,8 +1,8 @@
-import { type BoxGeometry, ExtrudeGeometry, Group, Mesh, Shape } from "three";
+import { type BoxGeometry, ExtrudeGeometry, Group, Mesh, MeshStandardMaterial, Shape } from "three";
 import { getMaterial, getWoodMaterial } from "../materials/factory";
 import { at, box, cylinder, named, tag } from "./common";
 import { unevenBox, type WallRelief } from "./unevenBox";
-import { CASE_Y_BACK, CASE_Y_FRONT, CASE_Z_BOTTOM, COVER_WALLS, LID_BOTTOM, PLINTH_HEIGHT, PLINTH_OVERHANG, WALL, type WallName } from "./case";
+import { CASE_Y_BACK, CASE_Y_FRONT, CASE_Z_BOTTOM, COVER_WALLS, LID_BOTTOM, PLINTH_HEIGHT, PLINTH_OVERHANG, RIM_HEIGHT, RIM_OUT, WALL, type WallName } from "./case";
 
 /** Ledge strip under the lid along the front and back walls (the lid rests on it): width and height, mm. The frame bars at the back must pass beside it when the frame is lifted out. */
 const LEDGE_WIDTH = 2.5;
@@ -102,11 +102,35 @@ export function buildBox(levelCount: number, pitch: number): BoxParts {
   walls.front.add(named(part(2 * (innerX - 1.5), LEDGE_WIDTH, LEDGE_HEIGHT, 0, WALL / 2 + LEDGE_WIDTH / 2, ledgeZ - wallZ, rawMaterial), "ledge:front"));
   walls.back.add(named(part(2 * (innerX - 1.5), LEDGE_WIDTH, LEDGE_HEIGHT, 0, -WALL / 2 - LEDGE_WIDTH / 2, ledgeZ - wallZ, rawMaterial), "ledge:back"));
 
-  // tiny pin heads on the outer front face (photo: dots along the wall)
-  for (let k = 0; k < 8; k++) {
-    const x = (k - 3.5) * 33;
-    const pin = at(cylinder(0.5, 0.4, "y", getMaterial("brass-dark"), 8), x, CASE_Y_FRONT - 0.15, LID_BOTTOM - 4);
-    pin.name = `wallPin:${k}`;
+  // a dark wooden rim round the top of the walls, just under the lid, held by brass pins (photo of the whole machine); it never moves
+  // ebonised wood, nearly black against the brass walls: a plain material of its own (no scan, no wear shader), shared by the four parts
+  const rimWood = new MeshStandardMaterial({ color: 0x0e0b09, roughness: 0.9, metalness: 0 });
+  const rimMaterial = (): MeshStandardMaterial => rimWood;
+  const rimZ = LID_BOTTOM - RIM_HEIGHT / 2 - 0.05;
+  const rimDepth = RIM_OUT + 0.6;
+  const rimHalf = outerHalf + RIM_OUT;
+  const rimFrontY = CASE_Y_FRONT - RIM_OUT;
+  const rimBackY = CASE_Y_BACK + RIM_OUT;
+  const rimPart = (name: string, sx: number, sy: number, x: number, y: number): void => {
+    root.add(named(part(sx, sy, RIM_HEIGHT, x, y, rimZ, rimMaterial()), name));
+  };
+  rimPart("rim:front", 2 * rimHalf, rimDepth, 0, rimFrontY + rimDepth / 2);
+  rimPart("rim:back", 2 * rimHalf, rimDepth, 0, rimBackY - rimDepth / 2);
+  rimPart("rim:left", rimDepth, rimBackY - rimFrontY - 2 * RIM_OUT, -rimHalf + rimDepth / 2, yMid);
+  rimPart("rim:right", rimDepth, rimBackY - rimFrontY - 2 * RIM_OUT, rimHalf - rimDepth / 2, yMid);
+  const pinMaterial = getMaterial("brass-brushed");
+  const pins: { name: string; x: number; y: number; axis: "x" | "y" }[] = [];
+  for (let k = 0; k < 9; k++) {
+    const x = (k - 4) * ((2 * rimHalf - 24) / 8);
+    pins.push({ name: `front:${k}`, x, y: rimFrontY, axis: "y" }, { name: `back:${k}`, x, y: rimBackY, axis: "y" });
+  }
+  for (let k = 0; k < 3; k++) {
+    const y = yMid + (k - 1) * ((rimBackY - rimFrontY - 24) / 2);
+    pins.push({ name: `left:${k}`, x: -rimHalf, y, axis: "x" }, { name: `right:${k}`, x: rimHalf, y, axis: "x" });
+  }
+  for (const spec of pins) {
+    const pin = at(cylinder(0.85, 0.7, spec.axis, pinMaterial, 10), spec.x, spec.y, rimZ);
+    pin.name = `wallPin:${spec.name}`;
     root.add(pin);
   }
   return { root, walls };
