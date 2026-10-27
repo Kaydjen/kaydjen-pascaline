@@ -219,7 +219,7 @@ body {
 
 .credits {
   position: fixed;
-  right: 22px;
+  left: 22px;
   bottom: 62px;
   width: 340px;
   padding: 12px 16px 10px;

@@ -6,11 +6,11 @@ function link(text: string, href: string): HTMLAnchorElement {
 }
 
 /**
- * Credits: one small, dim word at the end of the right dock group; it opens a small plate with the sources the licences ask to be named
+ * Credits: one small, dim word at the end of the left dock group; it opens a small plate with the sources the licences ask to be named
  * (the paper the model follows, the scans and the light, the fonts, three.js). Closes on a click elsewhere, on Escape and on the word again.
  */
 export function mountCredits(): void {
-  const dock = document.querySelector(".dock-right");
+  const dock = document.querySelector(".dock-left");
   if (!dock) return;
   const button = el("button", { class: "credits-button", text: "Credits", attrs: { type: "button", "aria-expanded": "false", "aria-controls": "credits" } });
   const panel = el("div", {

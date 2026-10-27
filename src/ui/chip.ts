@@ -9,13 +9,13 @@ export const LABEL_TRANSLATIONS = ["units", "tens", "hundreds", "thousands", "te
 const DELAY = 0.35;
 const NAMES_KEY = "pascaline.names";
 
-/** The Names switch: captions over the part under the pointer. On unless the visitor turned it off (remembered). */
+/** The Names switch: captions over the part under the pointer. Off until the visitor turns it on (remembered). */
 export class NamesSwitch {
-  private value = true;
+  private value = false;
 
   constructor() {
     try {
-      this.value = localStorage.getItem(NAMES_KEY) !== "0";
+      this.value = localStorage.getItem(NAMES_KEY) === "1";
     } catch {
       // storage unavailable: the default stays
     }

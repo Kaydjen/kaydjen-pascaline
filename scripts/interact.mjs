@@ -235,6 +235,7 @@ const dockOnly = await page.evaluate(() => {
 check("rest state shows only the dock", dockOnly.every((c) => c === "dock"), JSON.stringify(dockOnly));
 check("pause and speeds are hidden at rest", await page.evaluate(() => getComputedStyle(document.querySelector(".dock .time")).display === "none"));
 await page.screenshot({ path: join(out, "03-rest.png") });
+await page.click("text=Names"); // the captions are off until the visitor turns them on
 const label = await project(-20, 21.7, 48.2);
 await page.mouse.move(label.x, label.y);
 await page.waitForTimeout(900);
