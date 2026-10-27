@@ -97,7 +97,7 @@ async function start(): Promise<void> {
     armStylusHint = () => stylus.armHint();
     const player = new TeardownPlayer(() => session.teardown, (s) => session.setTeardown(s));
     const time = new TimeControl(session.clock);
-    const host = { assembly: () => session.assembly, mechanism: () => session.mechanism, teardown: () => session.teardown, close: () => player.play(0), slow: (on: boolean) => time.setSpeed(on ? 0.25 : 1) };
+    const host = { assembly: () => session.assembly, mechanism: () => session.mechanism, teardown: () => session.teardown, close: () => player.play(0), preset: (digits: number[]) => session.reset(digits), slow: (on: boolean) => time.setSpeed(on ? 0.25 : 1) };
     const ghost = new Ghost(host, stylus, stage.debug.camera);
     const router = new PointerRouter({ canvas, stage, session, stylus, hits, player, ghost });
     mountKeyboard({ stage, session, stylus, player, time, ghost });

@@ -25,6 +25,8 @@ export interface GhostHost {
   teardown(): number;
   /** Closes the machine (the stylus only works while the lid is on). */
   close(): void;
+  /** Sets the wheels to these digits at once (units first). */
+  preset(digits: number[]): void;
   /** Slow motion on or off (the carry of the demo runs slowly). */
   slow(on: boolean): void;
 }
@@ -37,7 +39,7 @@ const SWEEP_DEG_PER_SEC = 390;
 const MOVE_SECONDS = 0.45;
 /** How long the carry of the demo runs in slow motion (real seconds), then the clock returns to normal. */
 const CARRY_SLOW_SECONDS = 2;
-/** The demo works on this many wheels, from the units up: 999 + 1 carries through all three. */
+/** The demo sets this many wheels to 9, from the units up: 999 + 1 carries through all three. */
 const DEMO_WHEELS = 3;
 
 const smooth = (t: number): number => t * t * (3 - 2 * t);
@@ -117,8 +119,12 @@ export class Ghost {
     const mech = (): Mechanism => this.host.mechanism();
     const n = mech().levels.length;
     if (task === "demo") {
-      // dial nine on the three right wheels (what is missing to 9), lowest first, then add one in slow motion: the carry runs through all three
-      for (let level = 0; level < Math.min(DEMO_WHEELS, n); level++) yield* this.dial(level, 9 - mech().digit(level));
+      // the three right wheels stand at 9 (set at once: dialling them by hand takes most of the time), then one is added in slow motion:
+      // the carry runs through all three
+      const digits = mech().levels.map((_, level) => mech().digit(level));
+      for (let level = 0; level < Math.min(DEMO_WHEELS, n); level++) digits[level] = 9;
+      this.host.preset(digits);
+      yield 0.5;
       this.slowed = true;
       this.host.slow(true);
       yield* this.dial(0, 1, false);
