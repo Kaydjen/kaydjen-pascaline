@@ -44,6 +44,8 @@ export class PointerRouter {
   private locked = false;
   /** The pointer is on or near a dock button: the stylus stays where it is and the system cursor is back. */
   private uiZone = false;
+  /** A click on the resting stylus while the lid is up: it is taken as soon as the machine is closed. */
+  private takeWhenClosed = false;
 
   constructor(private readonly ctx: PointerContext) {
     const { canvas } = ctx;
@@ -135,6 +137,12 @@ export class PointerRouter {
   private click(hit: Hit | null): void {
     const { stylus } = this.ctx;
     if (hit?.name === "stand" || hit?.name === "stylus") {
+      if (stylus.cursorMode) {
+        // lid up: close the machine, then the stylus flies into the hand
+        this.ctx.player.play(0);
+        this.takeWhenClosed = true;
+        return;
+      }
       if (stylus.state === "slot" || stylus.state === "returning") stylus.pickUp();
       else if (stylus.state === "hand") stylus.park();
       return;
@@ -148,11 +156,20 @@ export class PointerRouter {
 
   /** Called every frame: hover target and the cursor. */
   update(): void {
-    const { stylus, canvas } = this.ctx;
+    const { stylus, canvas, player } = this.ctx;
+    if (this.takeWhenClosed) {
+      if (!stylus.cursorMode) {
+        stylus.pickUp();
+        this.takeWhenClosed = false;
+      } else if (!player.active) this.takeWhenClosed = false; // the closing was interrupted
+    }
     this.hovered = this.inside ? this.pick() : null;
     // the stylus in the hand is the pointer: no system cursor then; while it rests on its stand the cursor is there to find it
     const inHand = (stylus.state === "hand" || stylus.state === "inserted") && !this.uiZone;
-    const wanted = this.uiZone ? "default" : inHand ? "none" : this.hovered?.name === "stand" || this.hovered?.name === "stylus" ? "grab" : isStripHandle(this.hovered?.name) ? "pointer" : "";
+    // lid up: the stylus rests, the pointer itself grabs wheels and gears
+    const onDial = stylus.cursorMode && (stylus.dragging || stylus.hovered !== null);
+    const onStylus = (this.hovered?.name === "stand" || this.hovered?.name === "stylus");
+    const wanted = this.uiZone ? "default" : inHand ? "none" : onDial ? (stylus.dragging ? "grabbing" : "grab") : onStylus ? "grab" : isStripHandle(this.hovered?.name) ? "pointer" : "";
     if (canvas.style.cursor !== wanted) canvas.style.cursor = wanted;
   }
 }

@@ -14,8 +14,13 @@ export type DialKind = "wheel" | "gear";
 export const STOP_ANGLE = 180;
 /** Radius at which the stylus tip stands in a wheel gap, mm. */
 export const WHEEL_TIP_RADIUS = 11;
-/** Height of the stylus tip over the lid top when it works between the spokes, mm. */
-export const WHEEL_TIP_Z = 1.2;
+/** Height of the stylus tip over the wheel's middle plane when it works between the spokes (below the spoke tops, above the lid), mm. */
+export const WHEEL_TIP_Z = 0;
+/**
+ * The tip does not stand in the middle of a gap: it leans on the spoke that it pushes (the one behind it, as the wheel turns
+ * clockwise). At the tip radius a spoke edge is 9.25 degrees from the gap middle; the point's own radius takes about 2.5 more.
+ */
+export const WHEEL_TIP_LEAD_DEG = 6.6;
 /** Height over the lid (hover) and over the pin tops of gear 45 while the stylus is in hand but not inserted, mm. */
 export const HOVER_ABOVE_LID = 14;
 export const HOVER_ABOVE_GEAR = 12;
@@ -87,7 +92,7 @@ export const STYLUS_LENGTH_MM = 70;
 export function gapTip(dial: Dial, gap: number, u: number, inserted: boolean): Vector3 {
   const c = dial.centre;
   if (dial.kind === "wheel") {
-    const a = (wheelGapAngle(gap, u) * Math.PI) / 180;
+    const a = ((wheelGapAngle(gap, u) - WHEEL_TIP_LEAD_DEG) * Math.PI) / 180;
     return new Vector3(c.x + WHEEL_TIP_RADIUS * Math.sin(a), c.y + WHEEL_TIP_RADIUS * Math.cos(a), c.z + (inserted ? WHEEL_TIP_Z : WHEEL_TIP_Z + 5));
   }
   const a = (gearGapAngle(gap, u) * Math.PI) / 180;

@@ -36,6 +36,15 @@ describe("dialling geometry", () => {
     }
   });
 
+  it("puts the wheel tip against the spoke behind the gap, below the spoke tops", () => {
+    const dial = dialFor("wheel", 0, 3, 40, 0);
+    const tip = gapTip(dial, 4, 0.3, true);
+    const lean = clockwiseAngle(tip.x - dial.centre.x, tip.y - dial.centre.y) - wheelGapAngle(4, 0.3);
+    expect(lean).toBeLessThan(-4);
+    expect(lean).toBeGreaterThan(-9); // not into the spoke (its edge is 9.25 degrees away)
+    expect(tip.z - dial.centre.z).toBeLessThan(0.5);
+  });
+
   it("measures angles clockwise from north and takes the short way round", () => {
     expect(clockwiseAngle(0, 1)).toBeCloseTo(0, 9);
     expect(clockwiseAngle(1, 0)).toBeCloseTo(90, 9);

@@ -1,6 +1,7 @@
 import { Matrix4, Quaternion, type Ray, Vector2, Vector3 } from "three";
 import { stylusParkedPose } from "../parts/stylus";
 import type { Assembly } from "../scene/assembly";
+import { ASSEMBLED_S } from "../scene/teardown";
 import { STEP_DEG } from "../sim/params";
 import type { Mechanism } from "../sim/mechanism";
 import {
@@ -67,7 +68,9 @@ export class StylusController implements StylusSource {
   private pressed = false;
   /** Hover target under the pointer (wheel or gear and the nearest gap), or null. */
   private over: { dial: Dial; gap: number } | null = null;
-  private drag: { dial: Dial; gap: number; anchorU: number; lastAngle: number; swept: number; effective: number; maxDeg: number } | null = null;
+  private drag: { dial: Dial; gap: number; anchorU: number; lastAngle: number; swept: number; effective: number; maxDeg: number; s: number } | null = null;
+  /** The current drag is made by the bare pointer (lid open), not by the stylus. */
+  private cursorDrag = false;
 
   constructor(
     private readonly host: StylusHost,
@@ -93,7 +96,12 @@ export class StylusController implements StylusSource {
   }
 
   get dragging(): boolean {
-    return this.state === "inserted";
+    return this.state === "inserted" || this.cursorDrag;
+  }
+
+  /** Once the lid is up the stylus rests on its stand and the bare pointer turns wheels and gears. */
+  get cursorMode(): boolean {
+    return this.host.teardown() >= ASSEMBLED_S;
   }
 
   /** The dial the pointer is over (for the hover hint lamp), or null. */
@@ -112,6 +120,7 @@ export class StylusController implements StylusSource {
   /** Picks the stylus up from its stand (it flies to the pointer). */
   pickUp(): void {
     if (this.state !== "slot" && this.state !== "returning") return;
+    if (this.cursorMode) return;
     const assembly = this.host.assembly();
     assembly.stylusParked = false;
     if (!this.taken) {
@@ -138,6 +147,14 @@ export class StylusController implements StylusSource {
   /** True when a press at the current pointer was taken by the stylus (so that other click behaviours stay quiet). */
   press(hit: Hit | null): boolean {
     void hit;
+    if (this.cursorMode) {
+      if (this.over && !this.cursorDrag) {
+        this.startDrag(this.over.dial, this.over.gap);
+        this.cursorDrag = true;
+        return true;
+      }
+      return false;
+    }
     if (this.state === "hand") {
       if (this.over) {
         this.insert(this.over.dial, this.over.gap);
@@ -151,6 +168,7 @@ export class StylusController implements StylusSource {
   release(): void {
     if (this.drag) this.host.mechanism().setDrive(this.drag.dial.level, null);
     this.drag = null;
+    this.cursorDrag = false;
     this.pressed = false;
     if (this.state === "inserted") this.state = "hand";
   }
@@ -162,14 +180,30 @@ export class StylusController implements StylusSource {
   }
 
   private insert(dial: Dial, gap: number): void {
+    this.startDrag(dial, gap);
+    this.pressed = true;
+    this.state = "inserted";
+  }
+
+  private startDrag(dial: Dial, gap: number): void {
     const u = this.host.mechanism().levels[dial.level]!.u;
     const gapAngle = dial.kind === "wheel" ? wheelGapAngle(gap, u) : gearGapAngle(gap, u);
     const lastAngle = this.pointerAngle(dial) ?? gapAngle;
     // a lid wheel stops when the gap meets the stop lever; gear 45 has no stop (several digits per drag)
     const maxDeg = dial.kind === "wheel" ? ((STOP_ANGLE - gapAngle + 720) % 360) : Infinity;
-    this.drag = { dial, gap, anchorU: u, lastAngle, swept: 0, effective: 0, maxDeg };
-    this.pressed = true;
-    this.state = "inserted";
+    this.drag = { dial, gap, anchorU: u, lastAngle, swept: 0, effective: 0, maxDeg, s: this.host.teardown() };
+  }
+
+  /** Follows the pointer about the dial axis: the dial only turns forward and no further than its stop. */
+  private driveDrag(drag: NonNullable<StylusController["drag"]>): void {
+    const mech = this.host.mechanism();
+    const angle = this.pointerAngle(drag.dial);
+    if (angle !== null) {
+      drag.swept += angleDelta(drag.lastAngle, angle);
+      drag.lastAngle = angle;
+    }
+    drag.effective = Math.min(Math.max(drag.effective, drag.swept), drag.maxDeg);
+    mech.setDrive(drag.dial.level, drag.anchorU + drag.effective / STEP_DEG);
   }
 
   /** The pointer ray in machine coordinates (x right, y away, z up). */
@@ -200,9 +234,11 @@ export class StylusController implements StylusSource {
     this.over = null;
     if (!this.pointer) return;
     const s = this.host.teardown();
-    const kind = dialKind(s);
-    const hit = this.hits.pick(this.pointer, (name) => name.startsWith(kind === "wheel" ? "wheel:" : "gear:"));
+    // with the lid up both the wheels on it and gear 45 can be turned (by the pointer); closed, only the wheels
+    const kinds: DialKind[] = this.cursorMode ? ["wheel", "gear"] : [dialKind(s)];
+    const hit = this.hits.pick(this.pointer, (name) => kinds.some((k) => name.startsWith(`${k}:`)));
     if (!hit) return;
+    const kind: DialKind = hit.name.startsWith("wheel:") ? "wheel" : "gear";
     const level = Number(hit.name.split(":")[1]);
     const params = this.host.assembly().mechanismParams();
     const dial = dialFor(kind, level, params.levelCount, params.levelPitch, s);
@@ -239,9 +275,20 @@ export class StylusController implements StylusSource {
     const assembly = this.host.assembly();
     assembly.standHint = this.hintArmed && !this.taken;
     const step = Math.min(dt, 1 / 30);
+    if (this.cursorMode) {
+      if (this.state === "hand" || this.state === "inserted") this.park(); // the lid went up: the stylus goes back to its stand
+      if (this.drag && this.cursorDrag) {
+        if (Math.abs(this.drag.s - this.host.teardown()) > 1e-3) this.release(); // the dial moved away under the pointer
+        else this.driveDrag(this.drag);
+      } else {
+        this.findOver();
+      }
+    } else if (this.cursorDrag) {
+      this.release();
+    }
     if (this.state === "slot") {
       assembly.stylusParked = true;
-      this.over = null;
+      if (!this.cursorMode) this.over = null;
       return;
     }
     let target: Vector3;
@@ -251,7 +298,7 @@ export class StylusController implements StylusSource {
     if (this.state === "returning") {
       target = this.parkedPosition();
       wanted = PARKED_QUATERNION;
-      this.over = null;
+      if (!this.cursorMode) this.over = null;
       if (this.position.distanceTo(target) < 0.4 && this.velocity.length() < 2) {
         this.state = "slot";
         assembly.stylusParked = true;
@@ -272,15 +319,8 @@ export class StylusController implements StylusSource {
       }
     } else {
       const drag = this.drag!;
-      const mech = this.host.mechanism();
-      const angle = this.pointerAngle(drag.dial);
-      if (angle !== null) {
-        drag.swept += angleDelta(drag.lastAngle, angle);
-        drag.lastAngle = angle;
-      }
-      drag.effective = Math.min(Math.max(drag.effective, drag.swept), drag.maxDeg);
-      mech.setDrive(drag.dial.level, drag.anchorU + drag.effective / STEP_DEG);
-      const u = mech.levels[drag.dial.level]!.u;
+      this.driveDrag(drag);
+      const u = this.host.mechanism().levels[drag.dial.level]!.u;
       target = gapTip(drag.dial, drag.gap, u, true);
       stiffness = STIFFNESS_INSERTED;
       if (drag.dial.kind === "gear") axis = AXIS_GEAR;

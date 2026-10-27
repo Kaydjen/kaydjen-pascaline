@@ -143,6 +143,7 @@ for (const s of [0.4, 1]) {
   await page.screenshot({ path: join(out, `02-apart-${s}.png`) });
   const before = await digits();
   await dialGear(0, 2);
+  check(`apart s=${s}: the stylus rests on its stand and the pointer does the turning`, (await page.evaluate(() => window.__app.stylus.state)) === "slot");
   const after = await digits();
   const ok = (before[0] + 2) % 10 === after[0];
   check(`apart s=${s}: two steps on gear 45 of level 0 -> units ${before[0]} -> ${after[0]}`, ok, JSON.stringify(after));
@@ -154,6 +155,19 @@ for (const s of [0.4, 1]) {
   });
   check(`apart s=${s}: the lid wheel follows the level angle`, slaved);
 }
+// a click on the resting stylus while the lid is up closes the machine and puts the stylus in the hand
+await page.evaluate(() => window.__proto.setTeardown(0.4));
+await page.waitForTimeout(6000);
+const standNowSpot = await page.evaluate(() => {
+  const p = window.__proto.assembly.stylus.position;
+  return { x: p.x, y: p.y - 64, z: p.z }; // the knob end: the middle of the stylus hides behind the box wall from this view
+});
+const standNow = await project(standNowSpot.x, standNowSpot.y, standNowSpot.z);
+await page.mouse.move(standNow.x, standNow.y, { steps: 8 });
+await settle(400);
+await page.mouse.click(standNow.x, standNow.y);
+await page.waitForTimeout(5000);
+check("a click on the stylus with the lid up closes the machine and takes it", await page.evaluate(() => window.__proto.teardown < 0.02 && window.__app.stylus.state === "hand"), JSON.stringify(await page.evaluate(() => [window.__proto.teardown, window.__app.stylus.state, window.__app.player.active])));
 await page.evaluate(() => window.__proto.setTeardown(0));
 await page.waitForTimeout(2500);
 

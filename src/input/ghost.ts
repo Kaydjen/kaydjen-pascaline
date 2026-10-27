@@ -15,6 +15,7 @@ import {
 } from "./dialing";
 import type { StylusController } from "./stylusController";
 import { DIM } from "../parts/dimensions";
+import { ASSEMBLED_S } from "../scene/teardown";
 
 export type GhostTask = "demo" | "zero";
 
@@ -22,6 +23,8 @@ export interface GhostHost {
   assembly(): Assembly;
   mechanism(): Mechanism;
   teardown(): number;
+  /** Closes the machine (the stylus only works while the lid is on). */
+  close(): void;
 }
 
 /** Something the script waits for: a number of seconds, or a condition that must become true. */
@@ -90,6 +93,10 @@ export class Ghost {
   // --- script ---------------------------------------------------------------------------------
 
   private *run(task: GhostTask): Generator<Wait, void, void> {
+    if (this.host.teardown() >= ASSEMBLED_S) {
+      this.host.close();
+      yield () => this.host.teardown() < ASSEMBLED_S;
+    }
     yield* this.settle();
     const mech = (): Mechanism => this.host.mechanism();
     const n = mech().levels.length;
