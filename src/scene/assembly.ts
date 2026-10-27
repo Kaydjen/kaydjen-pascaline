@@ -26,6 +26,10 @@ const PANEL_DAMPING = 2 * 0.7 * PANEL_OMEGA;
 const PANEL_MAX_DT = 1 / 20;
 /** How far a lid pin rises when it is pulled out, mm. */
 const PIN_PULL = 7;
+/** The window glow of a carry: peak opacity (additive), how long it holds at the peak and how long it takes to fade, seconds. */
+const CARRY_GLOW_PEAK = 0.14;
+const CARRY_GLOW_HOLD = 0.35;
+const CARRY_GLOW_FADE = 1.3;
 const PIN_STIFFNESS = 900;
 const PIN_DAMPING = 2 * 0.42 * Math.sqrt(PIN_STIFFNESS);
 /** How far each pin leans when it is out, radians. */
@@ -122,7 +126,7 @@ export class Assembly {
   /** Soft light on the part under the pointer (wheel, gear, pin, strip), and a brief flash in a window when its digit changes. */
   private hoverGlow!: Sprite;
   private hoverWanted = 0;
-  private readonly digitGlows: { glow: Mesh<PlaneGeometry, MeshBasicMaterial>; last: number; strength: number }[] = [];
+  private readonly digitGlows: { glow: Mesh<PlaneGeometry, MeshBasicMaterial>; last: number; level: number; hold: number }[] = [];
   private readonly dust = createDust();
   private standClock = 0;
   private readonly levels: LevelParts[] = [];
@@ -209,7 +213,7 @@ export class Assembly {
       glow.userData.keep = true; // not merged into the lid: it changes by itself (the merge ignores visibility and baked a permanent plane into the window)
       glow.userData.noAo = true; // light, not a surface
       this.lidAssembly.add(glow);
-      this.digitGlows.push({ glow, last: -1, strength: 0 });
+      this.digitGlows.push({ glow, last: -1, level: 0, hold: 0 });
     }
     this.dust.points.visible = typeof location === "undefined" || !new URLSearchParams(location.search).has("still"); // ?still: a steady frame for the comparison shots
     this.root.add(this.dust.points);
@@ -258,16 +262,24 @@ export class Assembly {
     glow.material.opacity += (this.hoverWanted - glow.material.opacity) * (1 - Math.exp(-Math.max(dt, 0) / 0.12));
     if (this.hoverWanted === 0 && glow.material.opacity < 0.004) glow.material.opacity = 0;
     glow.visible = glow.material.opacity > 0;
+    // a window glows softly only when its digit changed by a carry (the level was not being turned by the stylus or the pointer): a rare,
+    // meaningful event. It rises in about a quarter of a second, holds a moment and fades slowly; a second carry just extends it.
+    const span = Math.max(dt, 0);
     this.digitGlows.forEach((entry, i) => {
       const digit = this.mechanism.digit(i);
       if (entry.last < 0) entry.last = digit;
       else if (digit !== entry.last) {
         entry.last = digit;
-        entry.strength = 1;
+        if (i > 0 && this.mechanism.levels[i]!.drive === null) entry.hold = CARRY_GLOW_HOLD;
       }
-      entry.strength = Math.max(0, entry.strength - Math.max(dt, 0) / 0.8);
-      entry.glow.material.opacity = 0.7 * entry.strength * entry.strength;
-      entry.glow.visible = entry.strength > 0;
+      if (entry.hold > 0) {
+        entry.hold -= span;
+        entry.level += (1 - entry.level) * (1 - Math.exp(-span / 0.12));
+      } else {
+        entry.level = Math.max(0, entry.level - span / CARRY_GLOW_FADE);
+      }
+      entry.glow.material.opacity = CARRY_GLOW_PEAK * entry.level * entry.level;
+      entry.glow.visible = entry.level > 0.002;
     });
     this.dust.update(dt);
   }

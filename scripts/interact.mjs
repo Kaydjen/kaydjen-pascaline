@@ -273,6 +273,15 @@ check("Credits opens a plate with the paper and a licence link", await page.eval
 await page.keyboard.press("Escape");
 check("Escape closes the credits", await page.evaluate(() => document.getElementById("credits").hasAttribute("hidden")));
 
+// 7d. a window glows only when its digit changed by a carry, never for the level that is being turned
+await page.evaluate(() => window.__proto.reset([9, 9, 0, 0, 0, 0]));
+await page.waitForTimeout(800);
+await page.evaluate(() => window.__proto.mechanism.setDrive(0, 10));
+const carried = await page.waitForFunction(() => { const g = window.__proto.assembly.digitGlows; return g[1].level > 0.05 ? [g[0].level, g[1].level, g[2].level] : false; }, null, { timeout: 8000 }).then((h) => h.jsonValue(), () => null);
+await page.evaluate(() => window.__proto.mechanism.setDrive(0, null));
+check("a carry lights the window of the receiving level only, not the turned one", carried !== null && carried[0] === 0, JSON.stringify(carried));
+await page.waitForTimeout(3500);
+
 // 8. demo and zero, assembled and apart, and cancelling
 const waitIdle = (ms = 90000) => page.waitForFunction(() => window.__app.ghost.running === null, null, { timeout: ms });
 await page.evaluate(() => window.__proto.reset([3, 7, 2, 9, 0, 5]));
