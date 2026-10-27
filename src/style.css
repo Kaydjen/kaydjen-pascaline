@@ -173,23 +173,31 @@ body {
   transition-duration: 150ms;
 }
 
-.hint {
+.caption {
   position: fixed;
-  left: 50%;
-  bottom: 74px;
+  left: 22px;
+  bottom: 64px;
   margin: 0;
-  transform: translateX(-50%);
   color: #cdbfa6;
   font: italic 17px/1.2 "EB Garamond Italic", serif;
   letter-spacing: 0.02em;
-  white-space: nowrap;
   pointer-events: none;
   opacity: 0;
-  transition: opacity 500ms ease-out;
+  transition: opacity 200ms ease-out;
 }
 
-.hint.visible {
+.caption.visible {
   opacity: 0.85;
+}
+
+.dock .time {
+  display: none;
+  align-items: center;
+  gap: 14px;
+}
+
+.dock .time.shown {
+  display: flex;
 }
 
 .sr-only {
@@ -269,7 +277,7 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .dock button,
   .chip,
-  .hint,
+  .caption,
   .loading-dots {
     transition-duration: 1ms;
   }

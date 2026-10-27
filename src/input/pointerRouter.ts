@@ -47,6 +47,8 @@ export class PointerRouter {
   private uiZone = false;
   /** A click on the resting stylus while the lid is up: it is taken as soon as the machine is closed. */
   private takeWhenClosed = false;
+  /** A press on the sliding strip: dragging it moves the strip along y, a click flips it. */
+  private stripGrab: { planeZ: number; y0: number; offset0: number; active: boolean } | null = null;
 
   constructor(private readonly ctx: PointerContext) {
     const { canvas } = ctx;
@@ -55,6 +57,7 @@ export class PointerRouter {
     canvas.addEventListener("pointerup", this.onUp);
     canvas.addEventListener("pointercancel", this.onCancel);
     canvas.addEventListener("pointerleave", this.onLeave);
+    canvas.addEventListener("dblclick", this.onDouble);
   }
 
   dispose(): void {
@@ -64,6 +67,7 @@ export class PointerRouter {
     canvas.removeEventListener("pointerup", this.onUp);
     canvas.removeEventListener("pointercancel", this.onCancel);
     canvas.removeEventListener("pointerleave", this.onLeave);
+    canvas.removeEventListener("dblclick", this.onDouble);
   }
 
   private setNdc(event: PointerEvent | MouseEvent): void {
@@ -103,10 +107,45 @@ export class PointerRouter {
       return;
     }
     this.down = { x: event.clientX, y: event.clientY, hit };
+    if (hit && isStripHandle(hit.name)) {
+      const assembly = this.ctx.session.assembly;
+      const planeZ = assembly.machine.worldToLocal(hit.point.clone()).z;
+      const y0 = this.stripY(planeZ);
+      if (y0 !== null) this.stripGrab = { planeZ, y0, offset0: assembly.slideOffset(), active: false };
+    }
+  };
+
+  /** Where the pointer ray meets the horizontal plane `z` (machine frame): the y position along the strip's travel. */
+  private stripY(z: number): number | null {
+    const machine = this.ctx.session.assembly.machine;
+    machine.updateWorldMatrix(true, false);
+    const ray = this.ctx.hits.ray(this.ndc).clone().applyMatrix4(machine.matrixWorld.clone().invert());
+    if (Math.abs(ray.direction.z) < 1e-4) return null;
+    const t = (z - ray.origin.z) / ray.direction.z;
+    return t > 0 ? ray.origin.y + t * ray.direction.y : null;
+  }
+
+  /** Double click on the background: the camera glides back to the standard view. */
+  private onDouble = (): void => {
+    if (!this.pick()) this.ctx.stage.rig?.setPreset("default");
   };
 
   private onMove = (event: PointerEvent): void => {
     this.setNdc(event);
+    const grab = this.stripGrab;
+    if (!grab || !this.down) return;
+    if (!grab.active && Math.hypot(event.clientX - this.down.x, event.clientY - this.down.y) > CLICK_SLOP) {
+      grab.active = true;
+      this.lockCamera(true);
+      this.ctx.canvas.setPointerCapture(event.pointerId);
+    }
+    const y = grab.active ? this.stripY(grab.planeZ) : null;
+    if (y === null) return;
+    const { session } = this.ctx;
+    const offset = grab.offset0 + (y - grab.y0);
+    session.assembly.holdPanel(offset);
+    const row = offset >= 0 ? "ascending" : "descending";
+    if (session.visibleRow !== row) session.setVisibleRow(row);
   };
 
   private onUp = (event: PointerEvent): void => {
@@ -121,10 +160,18 @@ export class PointerRouter {
     this.lockCamera(false);
     const down = this.down;
     this.down = null;
+    const grab = this.stripGrab;
+    this.stripGrab = null;
+    if (grab?.active) {
+      this.ctx.session.assembly.holdPanel(null); // the spring takes the strip to the nearest stop
+      return;
+    }
     if (down && Math.hypot(event.clientX - down.x, event.clientY - down.y) < CLICK_SLOP) this.click(down.hit);
   };
 
   private onCancel = (): void => {
+    this.stripGrab = null;
+    this.ctx.session.assembly.holdPanel(null);
     this.ctx.stylus.release();
     this.lockCamera(false);
     this.down = null;
@@ -178,7 +225,7 @@ export class PointerRouter {
     const onDial = stylus.cursorMode && (stylus.dragging || stylus.hovered !== null);
     const onStylus = (this.hovered?.name === "stand" || this.hovered?.name === "stylus");
     const onPin = !stylus.cursorMode && this.hovered?.name.startsWith("pin:") === true;
-    const wanted = this.uiZone ? "default" : inHand ? "none" : onDial ? (stylus.dragging ? "grabbing" : "grab") : onStylus ? "grab" : onPin || isStripHandle(this.hovered?.name) ? "pointer" : "";
+    const wanted = this.uiZone ? "default" : inHand ? "none" : onDial ? (stylus.dragging ? "grabbing" : "grab") : onStylus ? "grab" : onPin ? "pointer" : isStripHandle(this.hovered?.name) ? (this.stripGrab?.active ? "grabbing" : "grab") : "";
     if (canvas.style.cursor !== wanted) canvas.style.cursor = wanted;
   }
 }

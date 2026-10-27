@@ -293,6 +293,13 @@ export class Assembly {
     return this.mechanism.params;
   }
 
+  /** Holds the sliding strip at `offset` (clamped to its travel) while the pointer drags it; null lets the spring take it to the wanted stop. */
+  holdPanel(offset: number | null): void {
+    this.panelHeld = offset === null ? null : Math.min(Math.max(offset, -BAR_TRAVEL), BAR_TRAVEL);
+  }
+
+  private panelHeld: number | null = null;
+
   /** Current offset of the sliding strip along y (the stylus parked in its barrel rides with it). */
   slideOffset(): number {
     return this.panelOffset;
@@ -366,7 +373,11 @@ export class Assembly {
    */
   update(pose: Pose = currentPose(this.mechanism), dt = 0, simDt = dt): void {
     // spring towards the target, sub-stepped; at rest it snaps exactly onto the target
-    const target = this.panelTarget();
+    if (this.panelHeld !== null) {
+      this.panelOffset = this.panelHeld;
+      this.panelVelocity = 0;
+    }
+    const target = this.panelHeld !== null ? this.panelHeld : this.panelTarget();
     const span = Math.min(Math.max(dt, 0), PANEL_MAX_DT);
     const substeps = Math.ceil(span * 240);
     for (let k = 0; k < substeps; k++) {

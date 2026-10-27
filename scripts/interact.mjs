@@ -232,7 +232,8 @@ const dockOnly = await page.evaluate(() => {
   const visible = [...document.body.children].filter((e) => !["SCRIPT", "CANVAS"].includes(e.tagName) && e.id !== "veil" && getComputedStyle(e).display !== "none" && !e.classList.contains("sr-only") && getComputedStyle(e).opacity !== "0" && e.getBoundingClientRect().width > 2);
   return visible.map((e) => e.className || e.id || e.tagName);
 });
-check("rest state shows only the dock and the hint line", dockOnly.every((c) => c === "dock" || c === "hint visible"), JSON.stringify(dockOnly));
+check("rest state shows only the dock", dockOnly.every((c) => c === "dock"), JSON.stringify(dockOnly));
+check("pause and speeds are hidden at rest", await page.evaluate(() => getComputedStyle(document.querySelector(".dock .time")).display === "none"));
 await page.screenshot({ path: join(out, "03-rest.png") });
 const label = await project(-20, 21.7, 48.2);
 await page.mouse.move(label.x, label.y);
@@ -242,11 +243,28 @@ check("hovering the label shows the English chip", chip.shown && chip.text.lengt
 const live = await page.evaluate(() => document.querySelector("[aria-live]").textContent);
 check("aria-live region reports the value", /^Value \d{6}$/.test(live), live);
 
+// 7b. the strip can be dragged along y and settles on the nearest stop; a double click on the background resets the camera
+const stripAt = await project(-20, 37.5, 48);
+await page.mouse.move(stripAt.x, stripAt.y, { steps: 4 });
+await page.waitForTimeout(300);
+const stripCursor = await page.evaluate(() => document.getElementById("scene").style.cursor);
+await page.mouse.down();
+await page.mouse.move(stripAt.x, stripAt.y + 40, { steps: 8 });
+await page.waitForTimeout(300);
+const during = await page.evaluate(() => window.__proto.assembly.slideOffset());
+await page.mouse.up();
+await page.waitForTimeout(1500);
+const after = await page.evaluate(() => [window.__proto.assembly.slideOffset(), window.__proto.visibleRow]);
+check("dragging the strip moves it and it settles on a stop", Math.abs(during) < 4.4 && Math.abs(Math.abs(after[0]) - 4.5) < 0.05, JSON.stringify({ stripCursor, during, after }));
+await page.mouse.dblclick(60, 120);
+await page.waitForTimeout(1500);
+check("a double click on the background keeps the camera working", await page.evaluate(() => !window.__stage.controls.object.position.toArray().some(Number.isNaN)));
+
 // 8. demo and zero, assembled and apart, and cancelling
 const waitIdle = (ms = 90000) => page.waitForFunction(() => window.__app.ghost.running === null, null, { timeout: ms });
 await page.evaluate(() => window.__proto.reset([3, 7, 2, 9, 0, 5]));
 await page.waitForTimeout(500);
-await page.click("text=Demo");
+await page.click("text=999 + 1");
 await waitIdle();
 await page.waitForTimeout(1500);
 d = await digits();
@@ -268,9 +286,9 @@ check("zero while apart (s = 0.4, gear 45) ends at 000000", d.every((x) => x ===
 await page.screenshot({ path: join(out, "04-zero-apart.png") });
 await page.evaluate(() => window.__proto.setTeardown(0));
 await page.waitForTimeout(2500);
-await page.click("text=Demo");
+await page.click("text=999 + 1");
 await page.waitForTimeout(4000);
-check("demo is running (the word turns accent)", await page.evaluate(() => document.querySelector(".dock button.accent")?.textContent === "Demo"));
+check("demo is running (the word turns accent)", await page.evaluate(() => document.querySelector(".dock button.accent")?.textContent === "999 + 1"));
 await page.mouse.click(300, 600);
 await page.waitForTimeout(400);
 check("a click cancels the demo", await page.evaluate(() => window.__app.ghost.running === null));

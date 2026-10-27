@@ -6,8 +6,9 @@ import type { PrototypeSession } from "../scene/prototype";
 import type { TeardownPlayer } from "../scene/teardownPlayer";
 import { mountChip } from "./chip";
 import { mountDock } from "./dock";
-import { mountHints } from "./hints";
+import { mountNames } from "./names";
 import { mountLive } from "./live";
+import { ASSEMBLED_S } from "../scene/teardown";
 
 export interface UiContext {
   session: PrototypeSession;
@@ -22,8 +23,9 @@ export interface Ui {
   update(dt: number): void;
 }
 
-/** The whole interface: dock (view steps, add/subtract, demo, reset, time), hover chip, hint line, live region. */
+/** The whole interface: dock (view steps and names, add/subtract, 999 + 1, reset, time), hover chip, part captions, live region. */
 export function mountUi(ctx: UiContext): Ui {
+  const names = mountNames();
   const dock = mountDock({
     session: ctx.session,
     player: ctx.player,
@@ -31,16 +33,17 @@ export function mountUi(ctx: UiContext): Ui {
     stylus: ctx.stylus,
     demo: () => ctx.ghost.toggle("demo"),
     zero: () => ctx.ghost.toggle("zero"),
+    names: { get: () => names.on, set: (on) => (names.on = on) },
+    busy: () => ctx.ghost.running !== null || !ctx.session.mechanism.settled(),
   });
   const chip = mountChip(ctx.session, ctx.stylus);
-  const hints = mountHints(ctx.session, ctx.stylus, ctx.player);
   const live = mountLive(ctx.session);
   return {
     update(dt) {
       dock.update();
       dock.setRunning(ctx.ghost.running);
       chip.update(dt, ctx.router.hovered, ctx.router.client);
-      hints.update(dt);
+      names.update(ctx.router.hovered, ctx.player.target >= ASSEMBLED_S, ctx.session.assembly.mechanismParams().levelCount);
       live.update(dt);
     },
   };

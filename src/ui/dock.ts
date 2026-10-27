@@ -2,7 +2,7 @@ import type { TimeControl, Speed } from "../input/controls";
 import type { StylusController } from "../input/stylusController";
 import type { PrototypeSession } from "../scene/prototype";
 import type { TeardownPlayer } from "../scene/teardownPlayer";
-import { NO_LID_S } from "../scene/teardown";
+import { ASSEMBLED_S, NO_LID_S } from "../scene/teardown";
 import { el, icon } from "./dom";
 
 export interface DockContext {
@@ -12,6 +12,10 @@ export interface DockContext {
   stylus: StylusController;
   demo: () => void;
   zero: () => void;
+  /** The part names switch. */
+  names: { get(): boolean; set(on: boolean): void };
+  /** Something moves on its own (the demo, a reset, the mechanism still running). */
+  busy: () => boolean;
 }
 
 export interface Dock {
@@ -24,16 +28,16 @@ const PAUSE = "M8 5v14M16 5v14";
 const PLAY = "M7 5l12 7-12 7z";
 
 /** The three resting states of the teardown, with the words the user sees. */
-export const VIEW_STEPS: readonly { label: string; s: number; title: string }[] = [
-  { label: "Closed", s: 0, title: "the machine as it stands" },
-  { label: "Lid off", s: NO_LID_S, title: "lift the lid and look at the mechanism" },
-  { label: "Apart", s: 1, title: "lift the mechanism out of the box" },
+export const VIEW_STEPS: readonly { label: string; s: number }[] = [
+  { label: "Closed", s: 0 },
+  { label: "Lid off", s: NO_LID_S },
+  { label: "Apart", s: 1 },
 ];
 
 /** A row of exclusive text buttons; the current one is brass. */
-function segmented(label: string, items: { text: string; title: string; onClick: () => void }[]): { node: HTMLElement; select(index: number): void } {
+function segmented(label: string, items: { text: string; onClick: () => void }[]): { node: HTMLElement; select(index: number): void } {
   const buttons = items.map((item) => {
-    const b = el("button", { class: "text", text: item.text, attrs: { type: "button", title: item.title, "aria-pressed": "false" } });
+    const b = el("button", { class: "text", text: item.text, attrs: { type: "button", "aria-pressed": "false" } });
     b.addEventListener("click", item.onClick);
     return b;
   });
@@ -50,22 +54,22 @@ function segmented(label: string, items: { text: string; title: string; onClick:
 }
 
 /**
- * Bottom bar. Left: how far the machine is taken apart (Closed / Lid off / Apart). Centre: the one switch that matters for
- * calculating, Add or Subtract. Right: demo, reset, pause and speed. Nothing else is on screen.
+ * Bottom bar. Left: how far the machine is taken apart (Closed / Lid off / Apart) and the part names. Right: Add or Subtract,
+ * the demo and reset. Centre: pause and speed, only while they are needed. Nothing else is on screen.
  */
 export function mountDock(ctx: DockContext): Dock {
   const { session, player, time } = ctx;
 
   const view = segmented(
     "View",
-    VIEW_STEPS.map((step) => ({ text: step.label, title: step.title, onClick: () => player.play(step.s) })),
+    VIEW_STEPS.map((step) => ({ text: step.label, onClick: () => player.play(step.s) })),
   );
   const mode = segmented("Operation", [
-    { text: "Add", title: "the drums show the number", onClick: () => session.setVisibleRow("ascending") },
-    { text: "Subtract", title: "the drums show the complement: turning a wheel takes that much away", onClick: () => session.setVisibleRow("descending") },
+    { text: "Add", onClick: () => session.setVisibleRow("ascending") },
+    { text: "Subtract", onClick: () => session.setVisibleRow("descending") },
   ]);
 
-  const pause = el("button", { class: "glyph", attrs: { type: "button", title: "pause (space)" } });
+  const pause = el("button", { class: "glyph", attrs: { type: "button" } });
   const syncPause = (): void => {
     pause.replaceChildren(icon(time.paused ? PLAY : PAUSE, time.paused ? "Play" : "Pause"));
     pause.setAttribute("aria-label", time.paused ? "Resume" : "Pause");
@@ -75,7 +79,7 @@ export function mountDock(ctx: DockContext): Dock {
 
   const speeds: [Speed, string][] = [[1, "1×"], [0.25, "¼×"], [0.05, "1/20×"]];
   const speedButtons = speeds.map(([speed, label]) => {
-    const b = el("button", { class: "text", text: label, attrs: { type: "button", "aria-label": `Speed ${label}`, title: `slow motion ${label}` } });
+    const b = el("button", { class: "text", text: label, attrs: { type: "button", "aria-label": `Speed ${label}` } });
     b.addEventListener("click", () => time.setSpeed(speed));
     return [speed, b] as const;
   });
@@ -90,21 +94,29 @@ export function mountDock(ctx: DockContext): Dock {
   time.onChange(syncSpeeds);
   syncSpeeds();
 
-  const button = (label: string, title: string, onClick: () => void): HTMLButtonElement => {
-    const b = el("button", { class: "text", text: label, attrs: { type: "button", title } });
+  const button = (label: string, onClick: () => void): HTMLButtonElement => {
+    const b = el("button", { class: "text", text: label, attrs: { type: "button" } });
     b.addEventListener("click", onClick);
     return b;
   };
-  const demo = button("Demo", "999999 + 1: watch the carry run through every wheel (d)", ctx.demo);
-  const zero = button("Reset", "turn every wheel back to 0", ctx.zero);
+  const demo = button("999 + 1", ctx.demo);
+  const zero = button("Reset", ctx.zero);
+  const names = button("Names", () => {
+    ctx.names.set(!ctx.names.get());
+    names.classList.toggle("on", ctx.names.get());
+    names.setAttribute("aria-pressed", String(ctx.names.get()));
+  });
+  names.classList.toggle("on", ctx.names.get());
+  names.setAttribute("aria-pressed", String(ctx.names.get()));
+  const timeBox = el("div", { class: "time", children: [pause, ...speedButtons.map(([, b]) => b)] });
 
   const bar = el("nav", {
     class: "dock",
     attrs: { "aria-label": "Controls" },
     children: [
-      el("div", { class: "dock-left", children: [view.node] }),
-      el("div", { class: "dock-centre", children: [mode.node] }),
-      el("div", { class: "dock-right", children: [demo, zero, el("span", { class: "sep" }), pause, ...speedButtons.map(([, b]) => b)] }),
+      el("div", { class: "dock-left", children: [view.node, names] }),
+      el("div", { class: "dock-centre", children: [timeBox] }),
+      el("div", { class: "dock-right", children: [mode.node, demo, zero] }),
     ],
   });
   document.body.append(bar);
@@ -118,6 +130,9 @@ export function mountDock(ctx: DockContext): Dock {
       });
       view.select(nearest);
       mode.select(session.visibleRow === "ascending" ? 0 : 1);
+      // pause and the speeds are there only while something moves, when time is not running normally, or when the machine is apart
+      const show = goal >= ASSEMBLED_S || ctx.busy() || player.active || ctx.time.paused || ctx.time.speed !== 1;
+      timeBox.classList.toggle("shown", show);
     },
     setRunning(which) {
       demo.classList.toggle("accent", which === "demo");
