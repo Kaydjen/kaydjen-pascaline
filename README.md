@@ -2,7 +2,7 @@
 
 # Pascaline reconstruction
 
-Reconstruction after the Pascaline CnAM 823-1 and the model of Rojas-Sola et al., Machines 2021, 9, 136 (CC BY 4.0).
+Interactive 3D && built with procedurally generated geometry.
 
 </div>
 
@@ -32,4 +32,8 @@ Reconstruction after the Pascaline CnAM 823-1 and the model of Rojas-Sola et al.
 
 ---
 
-Tested in Chromium-based browsers (Edge); Safari and Firefox have not been tested. Desktop with a mouse.
+**Credits**
+
+Based on the Pascaline CnAM 823-1 and the geometric reconstruction described by J. I. Rojas-Sola, G. del Río-Cidoncha, A. Fernández-de la Puente Sarriá, and V. Galiano-Delgado in [“Blaise Pascal’s Mechanical Calculator: Geometric Modelling and Virtual Reconstruction”](https://doi.org/10.3390/machines9070136), _Machines_ 9(7), 136 (2021), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+
+This project adapts the published reconstruction into an interactive 3D model.
