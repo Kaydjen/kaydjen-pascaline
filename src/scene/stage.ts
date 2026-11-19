@@ -161,6 +161,9 @@ export function createStage(canvas: HTMLCanvasElement, onFatal: (message: string
   renderer.toneMappingExposure = 1.6;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = PCFShadowMap;
+  // the shadow map is redrawn only when a caster or the lamp moved (see `frame`): a still machine reused it, the 4096 map cost every frame
+  renderer.shadowMap.autoUpdate = false;
+  renderer.shadowMap.needsUpdate = true;
 
   // no scene background: the canvas is transparent and the page colour (style.css --bg) shows through, so the background stays the same
   // while the reveal ramps the exposure and while the page loads (a background drawn in the frame went black at exposure 0, then brown)
@@ -283,11 +286,29 @@ export function createStage(canvas: HTMLCanvasElement, onFatal: (message: string
     key.shadow.mapSize.set(QUALITY[debug.quality]!.shadow, QUALITY[debug.quality]!.shadow);
     key.shadow.map?.dispose();
     key.shadow.map = null;
+    renderer.shadowMap.needsUpdate = true;
     resize();
     return true;
   };
   let frameTime = 1 / 60;
   let slowFor = 0;
+
+  /**
+   * What the shadow depends on (world matrices of the visible casters, their changing geometry, the lamp), written into reused arrays and compared with the previous frame.
+   */
+  let casters: number[] = [];
+  let castersBefore: number[] = [];
+  const readCasters = (out: number[]): void => {
+    out.length = 0;
+    scene.traverseVisible((o) => {
+      const mesh = o as Mesh & { instanceMatrix?: { version: number } };
+      if (!mesh.isMesh || !mesh.castShadow) return;
+      for (const e of mesh.matrixWorld.elements) out.push(e);
+      out.push(mesh.geometry.id, (mesh.geometry.getAttribute("position") as { version?: number } | undefined)?.version ?? 0, mesh.instanceMatrix?.version ?? 0);
+    });
+    out.push(key.position.x, key.position.y, key.position.z);
+  };
+  const same = (a: number[], b: number[]): boolean => a.length === b.length && a.every((v, i) => v === b[i]);
   /** The lamp is a flame: its light wavers by about one per cent, slowly (`?still` keeps it steady). */
   const steady = typeof location !== "undefined" && new URLSearchParams(location.search).has("still");
   const flicker = (seconds: number): number => (steady ? 0 : 0.006 * Math.sin(seconds * 2.3) + 0.004 * Math.sin(seconds * 3.7 + 1.3) + 0.003 * Math.sin(seconds * 6.1 + 4.0));
@@ -319,6 +340,11 @@ export function createStage(canvas: HTMLCanvasElement, onFatal: (message: string
     key.target.position.copy(controls.target);
     key.position.copy(controls.target).add(keyOffset);
     // the reveal is a brightness ramp inside the frame: a CSS fade over a 4K canvas halved the frame rate of a laptop GPU while it ran
+    scene.updateMatrixWorld();
+    camera.updateMatrixWorld();
+    readCasters(casters);
+    if (!same(casters, castersBefore)) renderer.shadowMap.needsUpdate = true;
+    [casters, castersBefore] = [castersBefore, casters];
     const exposure = renderer.toneMappingExposure;
     renderer.toneMappingExposure = exposure * debug.fade * (1 + flicker(now / 1000));
     if (debug.postRender) debug.postRender(delta);
