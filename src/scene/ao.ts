@@ -50,6 +50,9 @@ const POOL_OPACITY_AO = 0.22;
  */
 const PLAIN_FROM_QUALITY = Infinity;
 
+/** Share of the frame size at which the occlusion is computed. */
+const AO_SCALE = 0.5;
+
 /** The render target of the occlusion composer (also given to the stage so that the shaders are compiled for it). */
 export function createAoTarget(renderer: WebGLRenderer): WebGLRenderTarget {
   const size = renderer.getSize(new Vector2());
@@ -64,6 +67,9 @@ export function installAo(debug: StageDebug, settings: AoSettings, target: WebGL
   composer.addPass(new RenderPass(scene, camera));
   const gtao = new GTAOPass(scene, camera, size.x, size.y);
   gtao.blendIntensity = settings.intensity;
+  // the normal pass, occlusion and denoise run at half the frame size (a quarter of the pixels); the blend reads the smooth occlusion with linear filtering
+  const setFullSize = gtao.setSize.bind(gtao);
+  gtao.setSize = (width, height) => setFullSize(Math.max(1, Math.round(width * AO_SCALE)), Math.max(1, Math.round(height * AO_SCALE)));
   gtao.updateGtaoMaterial({ radius: settings.radius, distanceExponent: settings.distanceExponent, thickness: settings.thickness, scale: 1, samples: 16 });
   const blend = new ShaderMaterial({
     uniforms: { tDiffuse: { value: null }, tScene: { value: null }, intensity: { value: settings.intensity }, directStrength: { value: settings.directStrength ?? 1 }, fade: { value: new Vector2(settings.fadeFrom ?? 0.15, settings.fadeTo ?? 0.8) } },
