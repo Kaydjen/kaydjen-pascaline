@@ -68,12 +68,10 @@ export function createPrototype(levelCount: number, lidOn = true, merge = true):
     reset(digits) {
       session.mechanism = new Mechanism({ levelCount });
       if (digits) session.mechanism.presetDigits(digits);
-      view.root.removeFromParent();
-      view = new Assembly(session.mechanism, { merge });
+      view.rebind(session.mechanism);
       view.setVisibleRow(row, true);
       applyCovers();
       view.setTeardown(teardown);
-      root.add(view.root);
       previous = currentPose(session.mechanism);
       recentEvents.length = 0;
     },

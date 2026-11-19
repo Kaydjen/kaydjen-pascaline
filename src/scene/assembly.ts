@@ -142,7 +142,7 @@ export class Assembly {
   private readonly settleState: { t: number; moving: boolean; previous: number }[] = [];
 
   constructor(
-    private readonly mechanism: Mechanism,
+    private mechanism: Mechanism,
     options: { merge?: boolean } = {},
   ) {
     const machine = this.machine;
@@ -235,6 +235,48 @@ export class Assembly {
       o.castShadow = !("isInstancedMesh" in o) && o.userData.noShadow !== true && o.geometry.boundingSphere!.radius > 8;
     });
     if (options.merge) mergeStatic(machine);
+    this.update();
+  }
+
+  /**
+   * Hands the machine to a new simulation (same size) and puts the transient looks back to a fresh machine's, without
+   * building the parts again (building them and the first draw of the new meshes froze the page for seconds).
+   */
+  rebind(mechanism: Mechanism): void {
+    this.mechanism = mechanism;
+    this.bounce.length = 0;
+    this.settleState.length = 0;
+    this.glows.forEach((g) => {
+      g.previousLift = 0;
+      g.lift.sprite.material.opacity = 0;
+      g.kick.sprite.material.opacity = 0;
+    });
+    this.digitGlows.forEach((d) => {
+      d.last = -1;
+      d.level = 0;
+      d.hold = 0;
+      d.glow.material.opacity = 0;
+      d.glow.visible = false;
+    });
+    this.hoverWanted = 0;
+    this.hoverGlow.material.opacity = 0;
+    this.hoverGlow.visible = false;
+    this.standGlow.material.opacity = 0;
+    this.standHint = false;
+    this.standClock = 0;
+    this.panelHeld = null;
+    this.panelVelocity = 0;
+    this.pinOut.fill(false);
+    this.pinLift.fill(0);
+    this.pinSpeed.fill(0);
+    this.lidWasUp = false;
+    this.stylusParked = true;
+    const park = stylusParkedPose(this.levelHalfSpan());
+    this.stylus.position.set(park.x, park.y, park.z);
+    this.stylus.quaternion.identity();
+    this.stylus.rotation.z = park.yaw;
+    this.stylus.rotation.x = 0;
+    this.setVisibleRow(this.visibleRow, true);
     this.update();
   }
 
