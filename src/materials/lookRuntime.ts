@@ -1,4 +1,4 @@
-import { EquirectangularReflectionMapping, NoColorSpace, PMREMGenerator, RepeatWrapping, SRGBColorSpace, ImageBitmapLoader, Texture, type MeshStandardMaterial, type WebGLRenderer, type WebGLRenderTarget } from "three";
+import { EquirectangularReflectionMapping, type Mesh, NoColorSpace, PMREMGenerator, RepeatWrapping, SRGBColorSpace, ImageBitmapLoader, Texture, type MeshStandardMaterial, type WebGLRenderer, type WebGLRenderTarget } from "three";
 import { HDRLoader } from "three/examples/jsm/loaders/HDRLoader.js";
 import { bakeLidFootprint } from "./footprint";
 import { createAoTarget, installAo } from "../scene/ao";
@@ -129,6 +129,14 @@ export function installLook(look: Look): LookRuntime {
       }
       for (const entries of registry.values()) for (const { material, resolved } of entries) apply(material, resolved);
 
+      // upload every texture now, while the page is still hidden: otherwise the first frame did it (and built their mipmaps) and hitched
+      for (const scan of Object.values(scans)) for (const texture of [scan.color, scan.normal, scan.roughness]) renderer.initTexture(texture);
+      scene.traverse((object) => {
+        const material = (object as Mesh).material;
+        for (const m of Array.isArray(material) ? material : material ? [material] : []) {
+          for (const value of Object.values(m)) if ((value as Texture | null)?.isTexture) renderer.initTexture(value as Texture);
+        }
+      });
       bakeLidFootprint(renderer, scene, GRIME_BLUR_MM);
       const ao = look.ao?.on && aoTarget ? installAo(debug, look.ao, aoTarget) : null;
       if (import.meta.env.DEV) void import("../dev/tune").then((m) => m.mountTune(debug, ao, tuneMaterial));
