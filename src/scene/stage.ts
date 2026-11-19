@@ -146,7 +146,8 @@ export interface StageOptions {
 export function createStage(canvas: HTMLCanvasElement, onFatal: (message: string) => void, content: StageContent, options: StageOptions = {}): Stage | null {
   let renderer: WebGLRenderer;
   try {
-    renderer = new WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
+    // with the occlusion composer the frame is antialiased in its multisampled target and only copied to the canvas: canvas MSAA would be wasted memory and bandwidth
+    renderer = new WebGLRenderer({ canvas, antialias: !options.compileTarget, powerPreference: "high-performance" });
   } catch {
     onFatal("WebGL2 is not available in this browser.");
     return null;
