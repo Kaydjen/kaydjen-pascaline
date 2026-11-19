@@ -1,4 +1,4 @@
-import { EquirectangularReflectionMapping, NoColorSpace, PMREMGenerator, RepeatWrapping, SRGBColorSpace, TextureLoader, type MeshStandardMaterial, type Texture, type WebGLRenderer, type WebGLRenderTarget } from "three";
+import { EquirectangularReflectionMapping, NoColorSpace, PMREMGenerator, RepeatWrapping, SRGBColorSpace, ImageBitmapLoader, Texture, type MeshStandardMaterial, type WebGLRenderer, type WebGLRenderTarget } from "three";
 import { HDRLoader } from "three/examples/jsm/loaders/HDRLoader.js";
 import { bakeLidFootprint } from "./footprint";
 import { createAoTarget, installAo } from "../scene/ao";
@@ -59,9 +59,14 @@ export function installLook(look: Look): LookRuntime {
     apply(material, resolved);
   });
 
-  const loader = new TextureLoader();
+  // fetch + createImageBitmap: the request goes out at once and the decode runs off the main thread (an <img> waited for the
+  // busy start-up thread); flipped here because an ImageBitmap ignores texture.flipY
+  const loader = new ImageBitmapLoader();
+  loader.setOptions({ imageOrientation: "flipY", premultiplyAlpha: "none", colorSpaceConversion: "none" });
   const loadMap = async (id: string, kind: "color" | "normal" | "roughness"): Promise<Texture> => {
-    const texture = await loader.loadAsync(SCAN_URL(id, kind));
+    const texture = new Texture(await loader.loadAsync(SCAN_URL(id, kind)));
+    texture.flipY = false;
+    texture.needsUpdate = true;
     texture.wrapS = texture.wrapT = RepeatWrapping;
     texture.anisotropy = 8;
     texture.colorSpace = kind === "color" ? SRGBColorSpace : NoColorSpace;

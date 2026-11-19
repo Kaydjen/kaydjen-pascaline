@@ -83,10 +83,10 @@ function steadyFrames(debug: { lowerQuality(): boolean }): Promise<void> {
 async function start(): Promise<void> {
   const loading = showLoading();
   let armStylusHint: (() => void) | undefined;
+  // ?plain skips the finished look (plain materials, plain render); installed first so that its scans and HDRI download while the textures are generated
+  const look = useBox || query.has("plain") ? null : installLook(FINAL_LOOK);
   if (!useBox) await buildTextures(1652);
   performance.mark("textures");
-  // ?plain skips the finished look (plain materials, plain render)
-  const look = useBox || query.has("plain") ? null : installLook(FINAL_LOOK);
   const session = useBox ? null : createPrototype(levels, query.get("lid") !== "0", !query.has("nomerge")) // ?nomerge keeps the meshes apart so that scripts/sheet.mjs can edit geometry;
   performance.mark("assembly");
   const stage = createStage(canvas, showFatal, session ? session.content : boxContent(), { compileTarget: look?.compileTarget });
