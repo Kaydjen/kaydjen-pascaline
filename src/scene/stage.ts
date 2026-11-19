@@ -27,7 +27,6 @@ import {
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { createCameraRig, MAX_POLAR, type CameraRig, type MachineViews } from "./cameraRig";
 
-const BACKGROUND = 0x0b0a09;
 /**
  * Quality steps: share of the base pixel ratio and shadow map size; the stage steps down after 2 s above 20 ms per frame and never up.
  * The base ratio is the screen's, capped so that the frame has at most PIXEL_BUDGET pixels (about 1.5 x Full HD) but never below 1:
@@ -147,7 +146,7 @@ export function createStage(canvas: HTMLCanvasElement, onFatal: (message: string
   let renderer: WebGLRenderer;
   try {
     // with the occlusion composer the frame is antialiased in its multisampled target and only copied to the canvas: canvas MSAA would be wasted memory and bandwidth
-    renderer = new WebGLRenderer({ canvas, antialias: !options.compileTarget, powerPreference: "high-performance" });
+    renderer = new WebGLRenderer({ canvas, alpha: true, antialias: !options.compileTarget, powerPreference: "high-performance" });
   } catch {
     onFatal("WebGL2 is not available in this browser.");
     return null;
@@ -163,8 +162,10 @@ export function createStage(canvas: HTMLCanvasElement, onFatal: (message: string
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = PCFShadowMap;
 
+  // no scene background: the canvas is transparent and the page colour (style.css --bg) shows through, so the background stays the same
+  // while the reveal ramps the exposure and while the page loads (a background drawn in the frame went black at exposure 0, then brown)
+  renderer.setClearColor(0x000000, 0);
   const scene = new Scene();
-  scene.background = new Color(BACKGROUND);
   const pmrem = new PMREMGenerator(renderer);
   // size 128 = the size of the baked studio HDRI: both environments then compile to the same shader variants (a different size would build every shader twice)
   const environment = pmrem.fromScene(buildEnvironmentScene(), 0.02, 0.1, 100, { size: 128 }).texture;

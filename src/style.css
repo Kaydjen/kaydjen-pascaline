@@ -1,5 +1,6 @@
 :root {
-  --bg: #0b0a09;
+  /* the colour the old in-frame background #0b0a09 had after tone mapping: the canvas is transparent and shows this one */
+  --bg: #010101;
   --text: #e8dfcf;
 }
 
@@ -22,6 +23,11 @@ body {
   width: 100vw;
   height: 100vh;
   touch-action: none;
+}
+
+/* hidden until the frames are steady: the quality steps resize the canvas while the page loads, and every resize flashed it */
+#scene:not(.ready) {
+  opacity: 0;
 }
 
 
