@@ -126,21 +126,48 @@ function addHolePatch(out: number[], half: (r: number) => number, top: (r: numbe
     emit(a, b, c, want);
     emit(a, c, d, want);
   };
-  const cellHole = (i: number, j: number): boolean => {
-    const y = yAt(j) + cell / 2;
-    return inHole(xAt(i + 0.5, y), y);
-  };
+  const holes: boolean[][] = [];
   for (let j = 0; j < rowCount; j++) {
+    const y = yAt(j) + cell / 2;
+    holes.push(Array.from({ length: columns }, (_, i) => inHole(xAt(i + 0.5, y), y)));
+  }
+  const cellHole = (i: number, j: number): boolean => holes[j]?.[i] === true;
+  const nearHole = (i: number, j: number): boolean => cellHole(i, j) || cellHole(i - 1, j) || cellHole(i + 1, j) || cellHole(i, j - 1) || cellHole(i, j + 1);
+  const rowHasHole = (j: number): boolean => holes[j]?.includes(true) === true;
+  // rows with no hole in them or next to them form one coarse stretch (the top only curves gently there); the rest stay cell by cell
+  const fineRow = (j: number): boolean => rowHasHole(j - 1) || rowHasHole(j) || rowHasHole(j + 1);
+  const p = (u: number, y: number, z: number): number[] => [xAt(u, y), y, z];
+  const rect = (i0: number, i1: number, j0: number, j1: number, flat: number | null): void => {
+    const y0 = yAt(j0), y1 = yAt(j1);
+    const z0 = flat ?? top(y0), z1 = flat ?? top(y1);
+    quad(p(i0, y0, z0), p(i1, y0, z0), p(i1, y1, z1), p(i0, y1, z1), [0, 0, 1]);
+  };
+  for (let j = 0; j < rowCount; ) {
+    if (!fineRow(j)) {
+      let end = j + 1;
+      while (end < rowCount && end - j < 10 && !fineRow(end)) end++;
+      rect(0, columns, j, end, null);
+      j = end;
+      continue;
+    }
     const y0 = yAt(j), y1 = yAt(j + 1);
-    for (let i = 0; i < columns; i++) {
-      const p = (u: number, y: number, z: number): number[] => [xAt(u, y), y, z];
-      const corners = [p(i, y0, top(y0)), p(i + 1, y0, top(y0)), p(i + 1, y1, top(y1)), p(i, y1, top(y1))];
-      const hole = cellHole(i, j);
-      if (hole) {
-        quad(p(i, y0, floorZ), p(i + 1, y0, floorZ), p(i + 1, y1, floorZ), p(i, y1, floorZ), [0, 0, 1]);
-      } else {
-        quad(corners[0]!, corners[1]!, corners[2]!, corners[3]!, [0, 0, 1]);
+    for (let i = 0; i < columns; ) {
+      if (cellHole(i, j)) {
+        let end = i + 1;
+        while (end < columns && cellHole(end, j)) end++;
+        rect(i, end, j, j + 1, floorZ);
+        i = end;
+        continue;
       }
+      if (!nearHole(i, j)) {
+        let end = i + 1;
+        while (end < columns && !nearHole(end, j)) end++;
+        rect(i, end, j, j + 1, null);
+        i = end;
+        continue;
+      }
+      rect(i, i + 1, j, j + 1, null);
+      const corners = [p(i, y0, top(y0)), p(i + 1, y0, top(y0)), p(i + 1, y1, top(y1)), p(i, y1, top(y1))];
       // walls where this cell and its neighbour differ: seen from the hole side
       const sides: [number, number, number[], number[], number[]][] = [
         [i - 1, j, corners[0]!, corners[3]!, [1, 0, 0]],
@@ -149,12 +176,14 @@ function addHolePatch(out: number[], half: (r: number) => number, top: (r: numbe
         [i, j + 1, corners[3]!, corners[2]!, [0, -1, 0]],
       ];
       for (const [ni, nj, a, b, towardsThis] of sides) {
-        if (hole || ni < 0 || ni >= columns || nj < 0 || nj >= rowCount || !cellHole(ni, nj)) continue;
+        if (!cellHole(ni, nj)) continue;
         // this is a solid cell next to a hole cell: the wall faces the hole, i.e. away from this cell
         const away = towardsThis.map((v) => -v);
         quad(a, b, [b[0]!, b[1]!, floorZ], [a[0]!, a[1]!, floorZ], away);
       }
+      i++;
     }
+    j++;
   }
 }
 
@@ -174,9 +203,11 @@ function spokeGeometry(dotted: boolean): BufferGeometry {
   const chamfer = 0.1;
   const rows: { y: number; hw: number }[] = [];
   const steps = Math.round((SPOKE_TIP_RADIUS - 0.2 - inner) / 0.5);
+  // sparse where the top is flat and the width linear (rows only at the kinks), every half millimetre where the top sinks
+  for (const y of [inner, SPOKE_HUB_RADIUS, HUB_DISC_RADIUS]) rows.push({ y, hw: half(y) });
   for (let k = 0; k <= steps; k++) {
     const y = inner + ((SPOKE_TIP_RADIUS - 0.2 - inner) * k) / steps;
-    rows.push({ y, hw: half(y) });
+    if (y > HUB_DISC_RADIUS + 1e-6) rows.push({ y, hw: half(y) });
   }
   rows.push({ y: SPOKE_TIP_RADIUS, hw: half(SPOKE_TIP_RADIUS) - 0.2 });
   // each section: bottom-left, left side top, top-left, top-right, right side top, bottom-right

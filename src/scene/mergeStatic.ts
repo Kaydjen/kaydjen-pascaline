@@ -1,5 +1,5 @@
 import { BufferAttribute, type BufferGeometry, Mesh, type Material, type Object3D } from "three";
-import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { mergeGeometries, mergeVertices } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
 /**
  * Performance pass: everything that moves as one rigid body is merged into one mesh per material (and per shadow
@@ -8,11 +8,13 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
  * the leaf spring), instanced meshes, hit targets and collision proxies are left alone (proxies are dropped: only tests read them).
  */
 function normalised(source: BufferGeometry): BufferGeometry {
-  const geometry = source.index ? source.toNonIndexed() : source.clone();
+  // a source without normals gets flat ones (as when it was made non-indexed first)
+  const geometry = source.index && !source.getAttribute("normal") ? source.toNonIndexed() : source.clone();
   for (const name of Object.keys(geometry.attributes)) if (name !== "position" && name !== "normal" && name !== "uv") geometry.deleteAttribute(name);
   if (!geometry.getAttribute("normal")) geometry.computeVertexNormals();
   if (!geometry.getAttribute("uv")) geometry.setAttribute("uv", new BufferAttribute(new Float32Array(geometry.getAttribute("position").count * 2), 2));
-  return geometry;
+  // indexed, so the vertex cache and shared vertices cut the vertex work; only vertices equal in position, normal and uv are welded
+  return geometry.index ? geometry : mergeVertices(geometry);
 }
 
 interface Bucket {
