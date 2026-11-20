@@ -12,7 +12,7 @@ https://github.com/user-attachments/assets/c7cbf71b-ffc9-4b13-9f6c-d157aa5cadf5
 
 ## In 3D
 
-The machine taken apart: lid with the input wheels, frame with the drums and output gears, box. The gearing inside the frame is left out to fit the size limit of a GitHub page.
+$\color{#8b949e}{\text{The machine taken apart: lid with the input wheels, frame with the drums and output gears, box. The gearing inside the frame is left out to fit the size limit of a GitHub page.}}$
 
 **Drag it.**
 
