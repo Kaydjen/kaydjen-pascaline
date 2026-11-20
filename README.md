@@ -33243,7 +33243,7 @@ endsolid pascaline
 
 ## Keep going
 
-The Pascaline is one step of a longer story. My other project puts it on a single timeline, from the abacus to multicore, and shows how each machine is built and how it works.
+$\color{#8b949e}{\text{The Pascaline is one step of a longer story. My other project puts it on a single timeline, from the abacus to multicore, and shows how each machine is built and how it works.}}$
 
 [![Evolution of Computers](assets/evolution.svg)](https://evolution-of-computers.vercel.app)
 
