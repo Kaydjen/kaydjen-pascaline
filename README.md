@@ -33257,9 +33257,9 @@ $$\begin{array}{l}
 
 
 
-[![Evolution of Computers](assets/evolution.svg)](https://evolution-of-computers.vercel.app)
+[![Evolution of Computers](assets/evolution.svg)](https://github.com/Kaydjen/evolution-of-computers)
 
-[Source code](https://github.com/Kaydjen/evolution-of-computers)
+[Webpage](https://evolution-of-computers.vercel.app)
 
 ---
 
