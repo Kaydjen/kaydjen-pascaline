@@ -33241,6 +33241,16 @@ endsolid pascaline
 
 ---
 
+## Keep going
+
+The Pascaline is one step of a longer story. My other project puts it on a single timeline, from the abacus to multicore, and shows how each machine is built and how it works.
+
+[![Evolution of Computers](assets/evolution.svg)](https://evolution-of-computers.vercel.app)
+
+[Source code](https://github.com/Kaydjen/evolution-of-computers)
+
+---
+
 **Credits**
 
 Based on the Pascaline CnAM 823-1 and the geometric reconstruction described by J. I. Rojas-Sola, G. del Río-Cidoncha, A. Fernández-de la Puente Sarriá, and V. Galiano-Delgado in [“Blaise Pascal’s Mechanical Calculator: Geometric Modelling and Virtual Reconstruction”](https://doi.org/10.3390/machines9070136), _Machines_ 9(7), 136 (2021), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
