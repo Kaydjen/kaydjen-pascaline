@@ -12,7 +12,12 @@ https://github.com/user-attachments/assets/c7cbf71b-ffc9-4b13-9f6c-d157aa5cadf5
 
 ## In 3D
 
-$\color{#8b949e}{\text{The machine taken apart: lid with the input wheels, frame with the drums and output gears, box. The gearing inside the frame is left out to fit the size limit of a GitHub page.}}$
+$$\begin{array}{l}
+\color{#8b949e}{\text{The machine taken apart: lid with the input}}\\
+\color{#8b949e}{\text{wheels, frame with the drums and output gears,}}\\
+\color{#8b949e}{\text{box. The gearing inside the frame is left out to}}\\
+\color{#8b949e}{\text{fit the size limit of a GitHub page.}}
+\end{array}$$
 
 **Drag it.**
 
@@ -33243,7 +33248,14 @@ endsolid pascaline
 
 ## Keep going
 
-$\color{#8b949e}{\text{The Pascaline is one step of a longer story. My other project puts it on a single timeline, from the abacus to multicore, and shows how each machine is built and how it works.}}$
+$$\begin{array}{l}
+\color{#8b949e}{\text{The Pascaline is one step of a longer story. My}}\\
+\color{#8b949e}{\text{other project puts it on a single timeline, from}}\\
+\color{#8b949e}{\text{the abacus to multicore, and shows how each}}\\
+\color{#8b949e}{\text{machine is built and how it works.}}
+\end{array}$$
+
+
 
 [![Evolution of Computers](assets/evolution.svg)](https://evolution-of-computers.vercel.app)
 
