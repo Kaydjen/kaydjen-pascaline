@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="168" height="48" viewBox="0 0 168 48" role="img" aria-labelledby="t">
+<title id="t">Webpage</title>
+<defs>
+<filter id="grain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="7"/><feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.05 0"/></filter>
+</defs>
+<rect width="168" height="48" fill="#0b0b0b"/>
+<rect width="168" height="48" filter="url(#grain)"/>
+<rect x=".5" y=".5" width="167" height="47" fill="none" stroke="#b8924a" stroke-opacity=".28"/>
+<text x="84" y="30" text-anchor="middle" font-family="system-ui, 'Segoe UI', sans-serif" font-size="18" letter-spacing="0.8" fill="#8a7f6c">Webpage</text>
+</svg>

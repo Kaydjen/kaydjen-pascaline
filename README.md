@@ -1,8 +1,8 @@
 <div align="center">
 
-# Pascaline reconstruction
+![Pascaline by Kaydjen](assets/banner.svg)
 
-Interactive 3D && built with procedurally generated geometry.
+[![Webpage](assets/webpage.svg)](https://kaydjen-pascaline.vercel.app)
 
 </div>
 
