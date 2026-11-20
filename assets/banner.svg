@@ -3,7 +3,7 @@
 <defs>
 <filter id="grain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="7"/><feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.05 0"/></filter>
 </defs>
-<rect width="1200" height="300" fill="#0b0b0b"/>
+<rect width="1200" height="300" fill="#0d1117"/>
 <rect width="1200" height="300" filter="url(#grain)"/>
 <text x="600" y="152" text-anchor="middle" font-family="'EB Garamond', Garamond, Georgia, 'Times New Roman', serif" font-size="84" letter-spacing="10" fill="#cdbfa6">Pascaline</text>
 <text x="600" y="222" text-anchor="middle" font-family="'EB Garamond', Garamond, Georgia, 'Times New Roman', serif" font-size="38" letter-spacing="4" fill="#8a7f6c" fill-opacity=".8">By Kaydjen</text>
