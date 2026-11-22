@@ -42,7 +42,7 @@ export function mountUi(ctx: UiContext): Ui {
     update(dt) {
       dock.update();
       dock.setRunning(ctx.ghost.running);
-      chip.update(dt, ctx.router.hovered, ctx.router.client);
+      chip.update(dt, ctx.router.hovered, ctx.router.client, () => ctx.router.see());
       live.update(dt);
     },
   };

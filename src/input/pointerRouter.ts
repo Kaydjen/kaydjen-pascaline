@@ -1,4 +1,4 @@
-import { type BoxGeometry, type Mesh, Vector2, Vector3 } from "three";
+import { type BoxGeometry, type Mesh, type Object3D, Vector2, Vector3 } from "three";
 import { NO_LID_S } from "../scene/teardown";
 import type { PrototypeSession } from "../scene/prototype";
 import type { Stage } from "../scene/stage";
@@ -229,6 +229,11 @@ export class PointerRouter {
       return;
     }
     if (isStripHandle(hit?.name)) this.ctx.session.setVisibleRow(this.ctx.session.visibleRow === "ascending" ? "descending" : "ascending");
+  }
+
+  /** The drawn surface under the pointer (null outside the scene); costs a full raycast, so callers ask for it sparingly. */
+  see(): { object: Object3D; point: Vector3 } | null {
+    return this.inside && !this.uiZone ? this.ctx.hits.see(this.ndc) : null;
   }
 
   /** Target under the pointer this frame (null when the pointer is outside), and the pointer in client pixels. */
