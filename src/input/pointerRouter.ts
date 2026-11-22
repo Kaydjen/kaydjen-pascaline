@@ -10,6 +10,13 @@ import type { StylusController } from "./stylusController";
 /** A press that moved less than this many pixels is a click. */
 const CLICK_SLOP = 5;
 
+/** True when a world point lies inside the (box-shaped) target. */
+function isInside(hit: Hit, point: Vector3): boolean {
+  const { width, height, depth } = ((hit.object as Mesh).geometry as BoxGeometry).parameters as { width: number; height: number; depth: number };
+  const p = hit.object.worldToLocal(point.clone());
+  return Math.abs(p.x) <= width / 2 && Math.abs(p.y) <= height / 2 && Math.abs(p.z) <= depth / 2;
+}
+
 /** True when the ray entered the (box-shaped) target through its +z face, i.e. from above. */
 function enteredThroughTop(hit: Hit): boolean {
   const geometry = (hit.object as Mesh).geometry as BoxGeometry;
@@ -94,10 +101,16 @@ export class PointerRouter {
     // the lid pins are small and sit close behind the strip ends: they win over the larger targets in front of them
     const pin = hits.pick(this.ndc, (name) => name.startsWith("pin:"));
     if (pin) return pin;
-    const first = hits.pick(this.ndc, (name) => !(inHand && name === "stylus"));
-    if (first?.name !== "box" || !enteredThroughTop(first)) return first;
-    // the box target is solid and its top face lies over everything inside: with the lid off, look through it to the parts below
-    return hits.pick(this.ndc, (name) => name !== "box" && !(inHand && name === "stylus")) ?? first;
+    const free = (name: string): boolean => !(inHand && name === "stylus");
+    let first = hits.pick(this.ndc, free);
+    // the box and frame targets are solid and lie over everything inside: look through them to the parts below
+    if (first?.name === "box" && enteredThroughTop(first)) first = hits.pick(this.ndc, (name) => name !== "box" && free(name)) ?? first;
+    if (first?.name === "frame") {
+      const frame = first;
+      const inner = hits.pick(this.ndc, (name) => name !== "box" && name !== "frame" && free(name));
+      if (inner && isInside(frame, inner.point)) return inner;
+    }
+    return first;
   }
 
   private lockCamera(on: boolean): void {
