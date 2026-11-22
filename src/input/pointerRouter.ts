@@ -1,4 +1,4 @@
-import { Vector2, Vector3 } from "three";
+import { type BoxGeometry, type Mesh, Vector2, Vector3 } from "three";
 import { NO_LID_S } from "../scene/teardown";
 import type { PrototypeSession } from "../scene/prototype";
 import type { Stage } from "../scene/stage";
@@ -9,6 +9,14 @@ import type { StylusController } from "./stylusController";
 
 /** A press that moved less than this many pixels is a click. */
 const CLICK_SLOP = 5;
+
+/** True when the ray entered the (box-shaped) target through its +z face, i.e. from above. */
+function enteredThroughTop(hit: Hit): boolean {
+  const geometry = (hit.object as Mesh).geometry as BoxGeometry;
+  const depth = geometry.parameters?.depth;
+  if (depth === undefined) return false;
+  return hit.object.worldToLocal(hit.point.clone()).z > depth / 2 - 0.01;
+}
 
 /** How far (px) around a dock button the pointer already counts as "at the dock": the cursor returns before the button is reached. */
 const DOCK_MARGIN = 56;
@@ -84,7 +92,12 @@ export class PointerRouter {
     const { stylus, hits } = this.ctx;
     const inHand = stylus.state === "hand" || stylus.state === "inserted";
     // the lid pins are small and sit close behind the strip ends: they win over the larger targets in front of them
-    return hits.pick(this.ndc, (name) => name.startsWith("pin:")) ?? hits.pick(this.ndc, (name) => !(inHand && name === "stylus"));
+    const pin = hits.pick(this.ndc, (name) => name.startsWith("pin:"));
+    if (pin) return pin;
+    const first = hits.pick(this.ndc, (name) => !(inHand && name === "stylus"));
+    if (first?.name !== "box" || !enteredThroughTop(first)) return first;
+    // the box target is solid and its top face lies over everything inside: with the lid off, look through it to the parts below
+    return hits.pick(this.ndc, (name) => name !== "box" && !(inHand && name === "stylus")) ?? first;
   }
 
   private lockCamera(on: boolean): void {
